@@ -117,14 +117,6 @@ create_download_links <- function(start_date, end_date, browser) {
     browser$findElements("id", "btnSearch")[[1]]$clickElement()
     Sys.sleep(3)
     
-    # Create folder to hold PDFs
-    save_path <- here("download_pdfs", "output")
-    folder_name <- paste0(start_date, "_", end_date, "_", "all-counties")
-    
-    if(!dir.exists(here(save_path, folder_name))) {
-        dir.create(here(save_path, folder_name))
-    }
-    
     # Wait for page to load
     court_df <- list()
     while(length(court_df) == 0) {
@@ -136,14 +128,14 @@ create_download_links <- function(start_date, end_date, browser) {
         Sys.sleep(0.001)
     }
     
-    # Extract docket number to name the PDFs
+    # Extract docket numbers to see if there are any cases in our time frame.
     court_df <- court_df[[1]]
     court_df <- court_df[-c(1, 2, 19)]
     court_df <-
         court_df %>% mutate(start_date = start_date, end_date = end_date)
     docket_ns <- court_df %>% pull(`Docket Number`)
     
-    # Download the PDFs conditional on there being PDFs to download.
+    # Collect PDF download links conditional on there being PDFs to download.
     if(docket_ns[1] != "No results found") {
         # Extract links to download PDFs
         links <-
