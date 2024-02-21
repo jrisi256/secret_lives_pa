@@ -2,6 +2,7 @@ library(here)
 library(dplyr)
 library(purrr)
 library(rvest)
+library(readr)
 library(stringr)
 library(lubridate)
 library(RSelenium)
@@ -10,7 +11,7 @@ library(RSelenium)
 ##                      Start web browser.                     ##
 #################################################################
 web_browser <- "firefox"
-remote_driver <- rsDriver(browser = web_browser, port = 4544L, chromever = NULL)
+remote_driver <- rsDriver(browser = web_browser, port = 4545L, chromever = NULL)
 rd_client <- remote_driver[["client"]]
 
 ##################################################################
@@ -73,6 +74,7 @@ while(T) {
     e_date <- s_date + days(180)
     
     if(e_date >= mdy("01-01-1950")) {
+        e_date <- ymd("1949-12-31")
         e_date_str <- "12-31-1949"
         
         if(web_browser == "chrome") {
@@ -103,9 +105,9 @@ while(T) {
 }
 
 ##################################################################
-##                      Download all PDFS.                      ##
+##                Collect all PDF download links                ##
 ##################################################################
-create_download_links <- function(start_date, end_date, browser) {
+scrape_download_links <- function(start_date, end_date, browser) {
     # Enter start dates and end dates
     sdate_box <- browser$findElement(using = "name", value = "FiledStartDate")
     sdate_box$sendKeysToElement(list(start_date))
@@ -115,9 +117,8 @@ create_download_links <- function(start_date, end_date, browser) {
     
     # Search for court cases
     browser$findElements("id", "btnSearch")[[1]]$clickElement()
-    Sys.sleep(3)
     
-    # Wait for page to load
+    # Waiting for page to load
     court_df <- list()
     while(length(court_df) == 0) {
         court_df <-
@@ -125,7 +126,6 @@ create_download_links <- function(start_date, end_date, browser) {
             read_html() %>%
             html_nodes("#caseSearchResultGrid") %>%
             html_table()
-        Sys.sleep(0.001)
     }
     
     # Extract docket numbers to see if there are any cases in our time frame.
@@ -163,14 +163,29 @@ create_download_links <- function(start_date, end_date, browser) {
     return(court_df)
 }
 
-download_links_df <-
-    pmap_dfr(
-        list(begin_dates[1:5], end_dates[1:5]),
-        create_download_links,
+download_links_list <-
+    pmap(
+        list(begin_dates, end_dates),
+        scrape_download_links,
         browser = rd_client
     )
+
+download_links_df <-
+    download_links_list %>%
+    map(
+        function(df) {df %>% mutate(`Incident #` = as.character(`Incident #`))}
+    ) %>%
+    list_rbind()
 
 #################################################################
 ##                        Close driver.                        ##
 #################################################################
 remote_driver$server$stop()
+
+##################################################################
+##                         Save results                         ##
+##################################################################
+write_csv(
+    download_links_df,
+    here("scrape_links", "output", "all_counties_1889_1949.csv")
+)
