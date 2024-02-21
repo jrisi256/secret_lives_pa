@@ -10,7 +10,7 @@ library(RSelenium)
 ##                      Start web browser.                     ##
 #################################################################
 web_browser <- "firefox"
-remote_driver <- rsDriver(browser = web_browser, port = 4545L)
+remote_driver <- rsDriver(browser = web_browser, port = 4544L, chromever = NULL)
 rd_client <- remote_driver[["client"]]
 
 ##################################################################
