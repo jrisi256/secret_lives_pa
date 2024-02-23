@@ -232,13 +232,28 @@ check_too_many_cases <- function(start_date, end_date, county, browser) {
     too_many_cases_flag <- F
     
     # Click on advanced search check box
-    if(length(browser$findElements("name", "AdvanceSearch")) != 0) {
-        browser$findElements("name", "AdvanceSearch")[[1]]$clickElement()
-    # Or if the search box did not appear, ran into an error. Refresh the page.
-    } else {
-        browser$refresh()
-        Sys.sleep(5)
-    }
+    browser$findElements("name", "AdvanceSearch")[[1]]$clickElement()
+    
+    #' TO DO
+    #' I am not sure when the error is triggered, but I suspect it is when we 
+    #' flood the Case Search portal page with too many requests in a specific
+    #' period of time. After such point in time, the page no longer loads.
+    #' 
+    #' I can better test for the existence of the error (e.g., explicitly
+    #' look for the words unauthorized request or something like that.)
+    #' 
+    #' I should probably turn this into a while loop.
+    #' 
+    #' I think refresh should work.
+    #' 
+    #' Then I should use rd_client$acceptAlert().
+    # if(length(browser$findElements("name", "AdvanceSearch")) != 0) {
+    #     
+    # # Or if the search box did not appear, ran into an error. Refresh the page.
+    # } else {
+    #     browser$refresh()
+    #     Sys.sleep(5)
+    # }
     
     # Enter start dates and end dates
     sdate_box <- browser$findElement(using = "name", value = "FiledStartDate")
@@ -269,15 +284,28 @@ check_too_many_cases <- function(start_date, end_date, county, browser) {
     
     # Waiting for page to load
     court_df <- list()
-    while(length(browser$getPageSource()) == 0) {
-        print("Waiting")
+    while(length(court_df) == 0) {
+        court_df <-
+            browser$getPageSource()[[1]] %>%
+            read_html() %>%
+            html_nodes("#caseSearchResultGrid") %>%
+            html_table()
     }
     
-    court_df <-
-        browser$getPageSource()[[1]] %>%
-        read_html() %>%
-        html_nodes("#caseSearchResultGrid") %>%
-        html_table()
+    #' TO DO
+    #' A second, more mysterious issue. I believe the issue originates here.
+    #' I will sometimes get a cryptic message that I am trying to access an
+    #' element of browser$getPageSource() that does not exist i.e., it is an 
+    #' empty list. Or somethign like that. It is a mysterious error because
+    #' the page loads fine, and I cannot see any errors. When I run the code 
+    #' manually in the console, it works fine. Not sure what's happening.
+    #' 
+    #' The idea is to create some while loop that wait until the page properly
+    #' loads? Might fix the issue.
+    #' 
+    # while(length(browser$getPageSource()) == 0) {
+    #     print("Waiting")
+    # }
     
     # The date range is too broad and some cases will not appear.
     # A box will appear telling us if there are too many cases to display.
@@ -308,6 +336,11 @@ check_too_many_cases <- function(start_date, end_date, county, browser) {
         )
     )
 }
+
+#' TO DO
+#' Add changes to 1899_1949 scraper.
+#' Make this scraper more robust. It should collect the tables as it goes along.
+#' Somehow save the results so it can restart itself in the case of a crash?
 
 ###########################################################################
 ##  Check and see if the date range works for each county-date coupling  ##
@@ -369,4 +402,3 @@ six_month_check <-
 ##                        Close driver.                        ##
 #################################################################
 remote_driver$server$stop()
-rd_client$acceptAlert()
