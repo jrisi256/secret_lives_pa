@@ -231,42 +231,29 @@ rd_client$findElement(
 check_too_many_cases <- function(start_date, end_date, county, browser) {
     too_many_cases_flag <- F
     
+    print(paste0("START DATE: ", start_date))
+    print(paste0("END DATE: ", end_date))
+    print(paste0("COUNTY: ", county))
+    
     # Click on advanced search check box
     browser$findElements("name", "AdvanceSearch")[[1]]$clickElement()
-    
-    #' TO DO
-    #' I am not sure when the error is triggered, but I suspect it is when we 
-    #' flood the Case Search portal page with too many requests in a specific
-    #' period of time. After such point in time, the page no longer loads.
-    #' 
-    #' I can better test for the existence of the error (e.g., explicitly
-    #' look for the words unauthorized request or something like that.)
-    #' 
-    #' I should probably turn this into a while loop.
-    #' 
-    #' I think refresh should work.
-    #' 
-    #' Then I should use rd_client$acceptAlert().
-    # if(length(browser$findElements("name", "AdvanceSearch")) != 0) {
-    #     
-    # # Or if the search box did not appear, ran into an error. Refresh the page.
-    # } else {
-    #     browser$refresh()
-    #     Sys.sleep(5)
-    # }
+    print("CLICKED ADVANCE SEARCH TEXT BOX")
     
     # Enter start dates and end dates
     sdate_box <- browser$findElement(using = "name", value = "FiledStartDate")
     sdate_box$sendKeysToElement(list(start_date))
+    print("ENTERED START DATE")
     
     enddate_box <- browser$findElement(using = "name", value = "FiledEndDate")
     enddate_box$sendKeysToElement(list(end_date))
+    print("ENTERED END DATE")
     
     # Click on county selection drop-down menu
     browser$findElement(
         using = "xpath",
         value = "/html[1]/body[1]/div[3]/div[2]/div[1]/form[1]/div[10]/div[2]/select[1]"
     )$clickElement()
+    print("CLICKED ON COUNTY SELECTION DROP DOWN")
     
     # Select the correct county
     browser$findElement(
@@ -278,9 +265,44 @@ check_too_many_cases <- function(start_date, end_date, county, browser) {
                 "]"
             )
         )$clickElement()
+    print("SELECTED COUNTY")
     
     # Search for court cases
-    browser$findElements("id", "btnSearch")[[1]]$clickElement()
+    searchBtn <- browser$findElements("id", "btnSearch")[[1]]
+    searchBtn$clickElement()
+    print("CLICKED SEARCH BUTTON")
+    
+    # Sometimes the web page errors. We are likely making too many requests.
+    unauthorized_request <-
+        browser$getPageSource()[[1]] %>%
+        read_html() %>%
+        html_nodes("pre") %>%
+        html_text()
+    
+    # If we do receive the unauthorized request error...
+    if(length(unauthorized_request) != 0) {
+        print("UNAUTHORIZED REQUEST")
+        
+        # Refresh the page.
+        browser$refresh()
+        print("REFRESHED BROWSER")
+        
+        # Accept the modal dialog pop-up box.
+        broweser$acceptAlert()
+        print("ACCEPTED DIALOG BOX")
+        
+        # Look for the search button.
+        searchBtn <- browser$findElements("id", "btnSearch")[[1]]
+        
+        # Need to wait for web page to load. Keep looking for search button.
+        while(length(searchBtn == 0)) {
+            searchBtn <- browser$findElements("id", "btnSearch")[[1]]
+        }
+        
+        # Once the search button has loaded, click it.
+        searchBtn$clickElement()
+        print("CLICKED SEARCH BUTTON AFTER UNAUTHORIZED REQUEST")
+    }
     
     # Waiting for page to load
     court_df <- list()
@@ -288,9 +310,10 @@ check_too_many_cases <- function(start_date, end_date, county, browser) {
         court_df <-
             browser$getPageSource()[[1]] %>%
             read_html() %>%
-            html_nodes("#caseSearchResultGrid") %>%
+            html_elements("#caseSearchResultGrid") %>%
             html_table()
     }
+    print("EXTRACTED TABLE")
     
     #' TO DO
     #' A second, more mysterious issue. I believe the issue originates here.
@@ -322,10 +345,12 @@ check_too_many_cases <- function(start_date, end_date, county, browser) {
     # If it's a Web Element, the element was found. The date range is too broad.
     if(class(too_many_cases) == "webElement") {
         too_many_cases_flag <- T
+        print("THERE ARE TOO MANY CASES")
     }
     
     # Reset the search field
     browser$findElements("id", "btnReset")[[1]]$clickElement()
+    print("RESET THE SEARCH FIELD")
     
     return(
         tibble(
@@ -371,7 +396,6 @@ check_by_county <- function(df, target_county, browser) {
         # Assume all future date pairs would also have too many cases. 
         # Stop searching for the current county.
         if(too_many_cases_flag == T) {
-            
             too_many_cases_col <-
                 c(
                     too_many_cases_col,
@@ -390,11 +414,15 @@ check_by_county <- function(df, target_county, browser) {
 }
 
 # Check and see if the 6-month search range works for each county-date record.
+test <-
+    county_and_dates %>%
+    filter(county %in% c("Adams", "Allegeheny", "Armstrong"), begin_date >= ymd("1990-02-21"))
+
 six_month_check <-
     map(
-        unique(county_and_dates$county),
+        unique(test$county),
         check_by_county,
-        df = county_and_dates,
+        df = test,
         browser = rd_client
     )
 
