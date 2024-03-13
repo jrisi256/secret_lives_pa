@@ -272,6 +272,12 @@ check_too_many_cases <- function(start_date, end_date, county, browser) {
     searchBtn$clickElement()
     print("CLICKED SEARCH BUTTON")
     
+    # Sometimes the page errors. Because the code executes faster then the page can load?
+    while(length(browser$getPageSource()) == 0) {
+        print("BROwSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.")
+        Sys.sleep(1)
+    }
+    
     # Sometimes the web page errors. We are likely making too many requests.
     unauthorized_request <-
         browser$getPageSource()[[1]] %>%
@@ -420,7 +426,7 @@ test <-
 
 six_month_check <-
     map(
-        unique(test$county),
+        county_and_dates$county,
         check_by_county,
         df = test,
         browser = rd_client
