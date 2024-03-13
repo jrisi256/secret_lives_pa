@@ -272,7 +272,7 @@ check_too_many_cases <- function(start_date, end_date, county, browser) {
     searchBtn$clickElement()
     print("CLICKED SEARCH BUTTON")
     
-    # Sometimes the page errors. Because the code executes faster then the page can load?
+    # Sometimes the page errors. Because the code executes faster then the page can load
     while(length(browser$getPageSource()) == 0) {
         print("BROwSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.")
         Sys.sleep(1)
@@ -294,7 +294,7 @@ check_too_many_cases <- function(start_date, end_date, county, browser) {
         print("REFRESHED BROWSER")
         
         # Accept the modal dialog pop-up box.
-        broweser$acceptAlert()
+        browser$acceptAlert()
         print("ACCEPTED DIALOG BOX")
         
         # Look for the search button.
@@ -320,21 +320,6 @@ check_too_many_cases <- function(start_date, end_date, county, browser) {
             html_table()
     }
     print("EXTRACTED TABLE")
-    
-    #' TO DO
-    #' A second, more mysterious issue. I believe the issue originates here.
-    #' I will sometimes get a cryptic message that I am trying to access an
-    #' element of browser$getPageSource() that does not exist i.e., it is an 
-    #' empty list. Or somethign like that. It is a mysterious error because
-    #' the page loads fine, and I cannot see any errors. When I run the code 
-    #' manually in the console, it works fine. Not sure what's happening.
-    #' 
-    #' The idea is to create some while loop that wait until the page properly
-    #' loads? Might fix the issue.
-    #' 
-    # while(length(browser$getPageSource()) == 0) {
-    #     print("Waiting")
-    # }
     
     # The date range is too broad and some cases will not appear.
     # A box will appear telling us if there are too many cases to display.
