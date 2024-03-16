@@ -40,7 +40,6 @@ if(file.exists(here(log_table_dir, log_file))) {
 #################################################################
 remote_driver <- rsDriver(browser = web_browser, port = 4545L, chromever = NULL)
 rd_client <- remote_driver[["client"]]
-rd_client$setTimeout(type = "page load", milliseconds = 20000)
 
 ##################################################################
 ##                     Navigate to website.                     ##
@@ -102,12 +101,7 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
     searchBtn$clickElement()
     cat("CLICKED SEARCH BUTTON\n")
     
-    # The page errors. Perhaps the code executes faster then the page can load?
-    while(length(browser$getPageSource()) == 0) {
-        cat("BROwSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.\n")
-    }
-    
-    # Sometimes the web page errors. We are likely making too many requests.
+    # Unauthorized request HTTP error.
     unauthorized_request <-
         browser$getPageSource()[[1]] %>%
         read_html() %>%
@@ -130,22 +124,38 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
             cat("ACCEPTED DIALOG BOX\n")
             
             # Look for the search button.
+            browser$setTimeout(type = "implicit", milliseconds = 20000)
             searchBtn <- browser$findElements("id", "btnSearch")
         }
         
         # Once the search button has loaded, click it.
+        browser$setTimeout(type = "implicit", milliseconds = 0)
         searchBtn[[1]]$clickElement()
         cat("CLICKED SEARCH BUTTON AFTER UNAUTHORIZED REQUEST\n")
     }
     
     # Waiting for the page to load.
-    court_cases_df <- list()
-    while(length(court_cases_df) == 0) {
+    repeat{
+        # Sometimes the web page errors. Code executes before page fully loads.
         court_cases_df <-
-            browser$getPageSource()[[1]] %>%
-            read_html() %>%
-            html_elements("#caseSearchResultGrid") %>%
-            html_table()
+            try(
+                browser$getPageSource()[[1]] %>%
+                    read_html() %>%
+                    html_elements("#caseSearchResultGrid") %>%
+                    html_table(),
+                silent = T
+            )
+        
+        if(class(court_cases_df) == "list") {
+            if(length(court_cases_df) != 0) {
+                break
+            # If the table is empty, an error won't be thrown.
+            } else {
+                next
+            }
+        } else {
+            cat("BROwSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.\n")
+        }
     }
     cat("SEARCH HAS CONCLUDED\n")
     
@@ -243,7 +253,7 @@ scrape_cases_by_county <- function(df, target_county, browser, scrape_dir, log_d
     # Keep only those dates associated with the target county.
     df <- df %>% filter(county == target_county) %>% arrange(begin_date)
     
-    sink(out_file)
+    sink(out_file, split = T)
     on.exit(sink())
     
     # For each pair of dates in the current county...
