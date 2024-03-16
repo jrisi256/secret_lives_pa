@@ -6,11 +6,6 @@ library(readr)
 library(stringr)
 library(RSelenium)
 
-# TO DOs
-# Fix the issue with implicit waits/page loads/unauthorized requests.
-# Reproduce the browser source error.
-# Retrofit the 1899-1949 scraper with the robust error handling.
-
 ##################################################################
 ##              Set up directories and file names.              ##
 ##################################################################
