@@ -12,8 +12,8 @@ library(RSelenium)
 search_table_dir <- here("scrape_links", "output", "search_tables")
 log_table_dir <- here("scrape_links", "output", "log_tables")
 scraped_table_dir <- here("scrape_links", "output", "scraped_tables")
-if(!dir.exists(scraped_table_dir)) {dir.create(scraped_table_dir)}
-if(!dir.exists(log_table_dir)) {dir.create(log_table_dir)}
+if(!dir.exists(scraped_table_dir)) {dir.create(scraped_table_dir, recursive = T)}
+if(!dir.exists(log_table_dir)) {dir.create(log_table_dir, recursive = T)}
 
 log_file <- "all_counties_6_months_log.csv"
 progress_file <- "scrape_progress.txt"
@@ -140,7 +140,7 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
                     html_table(),
                 silent = T
             )
-        
+
         if(class(court_cases_df) == "list") {
             if(length(court_cases_df) != 0) {
                 break
@@ -212,6 +212,7 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
             court_cases_df <-
                 court_cases_df[-c(1, 2, 19)] %>%
                 mutate(start_date = start_date, end_date = end_date)
+            cat("NO COURT CASES IN THIS TIME RANGE FOR THIS COUNTY\n")
         }
         
         # Save the table of cases.
@@ -251,6 +252,7 @@ scrape_cases_by_county <- function(df, target_county, browser, scrape_dir, log_d
     sink(out_file, split = T)
     on.exit(sink())
     
+    start_time <- Sys.time()
     # For each pair of dates in the current county...
     for(i in 1:nrow(df)) {
         # Scrape the table of court cases.
@@ -280,6 +282,8 @@ scrape_cases_by_county <- function(df, target_county, browser, scrape_dir, log_d
             write_csv(result, log_dir, append = T, col_names = !file.exists(log_dir), progress = F)
         }
     }
+    end_time <- Sys.time()
+    cat(paste0("TIME IT TOOK FOR SCRAPE TO COMPLETE: ", end_time - start_time))
 }
 
 #################################################################

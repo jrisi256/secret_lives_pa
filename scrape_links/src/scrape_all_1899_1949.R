@@ -39,13 +39,9 @@ end_dates <- list()
 
 if(web_browser == "chrome") {
     begin_dates <- append(begin_dates, s_date_str)
-} else if(web_browser == "firefox") {
-    begin_dates <- append(begin_dates, as.character(s_date))
-}
-
-if(web_browser == "chrome") {
     end_dates <- append(end_dates, e_date_str)
 } else if(web_browser == "firefox") {
+    begin_dates <- append(begin_dates, as.character(s_date))
     end_dates <- append(end_dates, as.character(e_date))
 }
 
@@ -108,67 +104,144 @@ while(T) {
 ##                Collect all PDF download links                ##
 ##################################################################
 scrape_download_links <- function(start_date, end_date, browser) {
+    
+    cat(paste0("START DATE: ", start_date, "\n"))
+    cat(paste0("END DATE: ", end_date, "\n"))
+    
     # Enter start dates and end dates
     sdate_box <- browser$findElement(using = "name", value = "FiledStartDate")
     sdate_box$sendKeysToElement(list(start_date))
+    cat("ENTERED START DATE\n")
     
     enddate_box <- browser$findElement(using = "name", value = "FiledEndDate")
     enddate_box$sendKeysToElement(list(end_date))
+    cat("ENTERED END DATE\n")
     
     # Search for court cases
     browser$findElements("id", "btnSearch")[[1]]$clickElement()
+    cat("CLICKED SEARCH BUTTON\n")
     
-    # Waiting for page to load
-    court_df <- list()
-    while(length(court_df) == 0) {
-        court_df <-
-            browser$getPageSource()[[1]] %>%
-            read_html() %>%
-            html_nodes("#caseSearchResultGrid") %>%
-            html_table()
+    # Unauthorized request HTTP error.
+    unauthorized_request <-
+        browser$getPageSource()[[1]] %>%
+        read_html() %>%
+        html_nodes("pre") %>%
+        html_text()
+    
+    # If we do receive the unauthorized request error...
+    if(length(unauthorized_request) != 0) {
+        cat("UNAUTHORIZED REQUEST\n")
+        searchBtn <- list()
+        
+        # Go through recovery process to get back to scraping.
+        while(length(searchBtn) == 0) {
+            # Refresh the page.
+            browser$refresh()
+            cat("REFRESHED BROWSER\n")
+            
+            # Accept the modal dialog pop-up box.
+            browser$acceptAlert()
+            cat("ACCEPTED DIALOG BOX\n")
+            
+            # Look for the search button.
+            browser$setTimeout(type = "implicit", milliseconds = 20000)
+            searchBtn <- browser$findElements("id", "btnSearch")
+        }
+        
+        # Once the search button has loaded, click it.
+        browser$setTimeout(type = "implicit", milliseconds = 0)
+        searchBtn[[1]]$clickElement()
+        cat("CLICKED SEARCH BUTTON AFTER UNAUTHORIZED REQUEST\n")
     }
     
-    # Extract docket numbers to see if there are any cases in our time frame.
-    court_df <- court_df[[1]]
-    court_df <- court_df[-c(1, 2, 19)]
-    court_df <-
-        court_df %>% mutate(start_date = start_date, end_date = end_date)
-    docket_ns <- court_df %>% pull(`Docket Number`)
-    
-    # Collect PDF download links conditional on there being PDFs to download.
-    if(docket_ns[1] != "No results found") {
-        # Extract links to download PDFs
-        links <-
-            browser$getPageSource()[[1]] %>%
-            read_html() %>%
-            html_nodes('a') %>%
-            html_attr('href')
+    # Waiting for the page to load.
+    repeat{
+        # Sometimes the web page errors. Code executes before page fully loads.
+        court_cases_df <-
+            try(
+                browser$getPageSource()[[1]] %>%
+                    read_html() %>%
+                    html_elements("#caseSearchResultGrid") %>%
+                    html_table(),
+                silent = T
+            )
         
+        if(class(court_cases_df) == "list") {
+            if(length(court_cases_df) != 0) {
+                break
+            # If the table is empty, an error won't be thrown.
+            } else {
+                next
+            }
+        } else {
+            cat("BROwSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.\n")
+        }
+    }
+    cat("SEARCH HAS CONCLUDED\n")
+    
+    # Check if there are any cases for the given date range.
+    court_cases_df <- court_cases_df[[1]]
+    no_results <- court_cases_df[[1,1]]
+    
+    # Collect PDF download links if there are PDFs to download.
+    if(no_results != "No results found") {
+        check_length <- c()
+        
+        # Ensure the table and links have properly loaded.
+        while(nrow(court_cases_df) != length(check_length)) {
+            links <-
+                browser$getPageSource()[[1]] %>%
+                read_html() %>%
+                html_nodes('a') %>%
+                html_attr('href')
+            check_length <- str_subset(links, "DocketSheet")
+            
+            court_cases_df <-
+                browser$getPageSource()[[1]] %>%
+                read_html() %>%
+                html_elements("#caseSearchResultGrid") %>%
+                html_table()
+            court_cases_df <- court_cases_df[[1]]
+        }
+        cat("COURT CASES AND LINKS HAVE FULLY LOADED\n")
+        
+        # Scrape the table and the links.
         durl <- "https://ujsportal.pacourts.us"
         docket_sheet_links <- paste0(durl, str_subset(links, 'DocketSheet'))
         court_summary_links <- paste0(durl, str_subset(links, 'CourtSummary'))
         
-        # Add links to our data table
-        court_df <-
-            court_df %>%
+        court_cases_df <-
+            court_cases_df[-c(1, 2, 19)] %>%
             mutate(
+                start_date = start_date,
+                end_date = end_date,
                 docket_sheet_link = docket_sheet_links,
                 court_summary_link = court_summary_links
             )
+    } else {
+        court_cases_df <-
+            court_cases_df[-c(1, 2, 19)] %>%
+            mutate(start_date = start_date, end_date = end_date)
+        cat("NO COURT CASES IN THIS TIME RANGE\n")
     }
+    cat("SCRAPED TABLE OF COURT CASES\n")
     
     # Reset the search field
     browser$findElements("id", "btnReset")[[1]]$clickElement()
+    cat("RESET THE SEARCH FIELD\n\n")
     
-    return(court_df)
+    return(court_cases_df)
 }
 
+start_time <- Sys.time()
 download_links_list <-
     pmap(
         list(begin_dates, end_dates),
         scrape_download_links,
         browser = rd_client
     )
+end_time <- Sys.time()
+print(paste0("TIME IT TOOK FOR SCRAPE TO COMPLETE: ", end_time - start_time))
 
 download_links_df <-
     download_links_list %>%
@@ -185,7 +258,9 @@ remote_driver$server$stop()
 ##################################################################
 ##                         Save results                         ##
 ##################################################################
+scraped_table_dir <- here("scrape_links", "output", "scraped_tables")
+if(!dir.exists(scraped_table_dir)) {dir.create(scraped_table_dir, recursive = T)}
+
 write_csv(
-    download_links_df,
-    here("scrape_links", "output", "all_counties_1889_1949.csv")
+    download_links_df, here(scraped_table_dir, "all_counties_1889_1949.csv")
 )
