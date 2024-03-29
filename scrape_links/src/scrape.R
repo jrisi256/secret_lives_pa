@@ -33,7 +33,22 @@ if(file.exists(here(log_table_dir, log_file))) {
 #################################################################
 ##                      Start web browser.                     ##
 #################################################################
-remote_driver <- rsDriver(browser = web_browser, port = 4545L, chromever = NULL)
+remote_driver <-
+    rsDriver(
+        browser = web_browser,
+        port = 4545L,
+        chromever = NULL,
+        extraCapabilities =
+            makeFirefoxProfile(
+                list(
+                    "browser.cache.disk.enable" = FALSE,
+                    "browser.cache.memory.enable" = FALSE,
+                    "browser.cache.offline.enable" = FALSE,
+                    "network.http.use-cache" = FALSE
+                )
+            )
+    )
+
 rd_client <- remote_driver[["client"]]
 
 ##################################################################
@@ -283,26 +298,46 @@ scrape_cases_by_county <- function(df, target_county, browser, scrape_dir, log_d
         }
     }
     end_time <- Sys.time()
-    cat(paste0("TIME IT TOOK FOR SCRAPE TO COMPLETE: ", end_time - start_time))
+    time_scrape <- end_time - start_time
+    nr_tables_scraped <- df %>% filter(!too_many_cases_flag) %>% nrow()
+        
+    cat(
+        paste0(
+            "TIME IT TOOK TO SCRAPE ",
+            nr_tables_scraped,
+            " TABLES: ",
+            time_scrape,
+            " ",
+            units(time_scrape)
+        )
+    )
 }
 
 #################################################################
 ##                       Begin scraping.                       ##
 #################################################################
-counties_list <- as.list(sort(unique(search_table$county)))
+temp <-
+    search_table %>%
+    filter(
+        county == "Adams",
+        begin_date <= ymd("1955-01-01")
+    )
+
+counties_list <- as.list(sort(unique(temp$county)))
+
 progress_files_list <-
     as.list(
         here(
             "scrape_links",
             "output",
-            paste0(sort(unique(search_table$county)), "_", progress_file)
+            paste0(sort(unique(temp$county)), "_", progress_file)
         )
     )
 
 pwalk(
     list(target_county = counties_list, out_file = progress_files_list),
     scrape_cases_by_county,
-    df = search_table,
+    df = temp,
     browser = rd_client,
     scrape_dir = scraped_table_dir,
     log_dir = here(log_table_dir, log_file)
