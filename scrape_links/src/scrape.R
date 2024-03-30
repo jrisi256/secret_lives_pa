@@ -317,28 +317,21 @@ scrape_cases_by_county <- function(df, target_county, browser, scrape_dir, log_d
 #################################################################
 ##                       Begin scraping.                       ##
 #################################################################
-temp <-
-    search_table %>%
-    filter(
-        county == "Adams",
-        begin_date <= ymd("1955-01-01")
-    )
-
-counties_list <- as.list(sort(unique(temp$county)))
+counties_list <- as.list(sort(unique(search_table$county)))
 
 progress_files_list <-
     as.list(
         here(
             "scrape_links",
             "output",
-            paste0(sort(unique(temp$county)), "_", progress_file)
+            paste0(sort(unique(search_table$county)), "_", progress_file)
         )
     )
 
 pwalk(
     list(target_county = counties_list, out_file = progress_files_list),
     scrape_cases_by_county,
-    df = temp,
+    df = search_table,
     browser = rd_client,
     scrape_dir = scraped_table_dir,
     log_dir = here(log_table_dir, log_file)
