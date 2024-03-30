@@ -44,7 +44,8 @@ remote_driver <-
                     "browser.cache.disk.enable" = FALSE,
                     "browser.cache.memory.enable" = FALSE,
                     "browser.cache.offline.enable" = FALSE,
-                    "network.http.use-cache" = FALSE
+                    "network.http.use-cache" = FALSE,
+                    "network.cookie.cookieBehavior" = 2
                 )
             )
     )
