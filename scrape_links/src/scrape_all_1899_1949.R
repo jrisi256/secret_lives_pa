@@ -256,7 +256,14 @@ download_links_list <-
         browser = rd_client
     )
 end_time <- Sys.time()
-cat(paste0("TIME IT TOOK FOR SCRAPE TO COMPLETE: ", end_time - start_time, "\n"))
+
+diff_time <- end_time - start_time
+cat(
+    paste0(
+        "IT TOOK: ", diff_time, " ", units(diff_time), " TO COLLECT ",
+        length(begin_dates), " TABLES.", "\n"
+    )
+)
 
 download_links_df <-
     download_links_list %>%
