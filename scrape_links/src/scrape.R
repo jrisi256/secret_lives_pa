@@ -39,14 +39,17 @@ remote_driver <-
         port = 4545L,
         chromever = NULL,
         extraCapabilities =
-            makeFirefoxProfile(
-                list(
-                    "browser.cache.disk.enable" = FALSE,
-                    "browser.cache.memory.enable" = FALSE,
-                    "browser.cache.offline.enable" = FALSE,
-                    "network.http.use-cache" = FALSE,
-                    "network.cookie.cookieBehavior" = 2
-                )
+            list(
+                makeFirefoxProfile(
+                    list(
+                        "browser.cache.disk.enable" = FALSE,
+                        "browser.cache.memory.enable" = FALSE,
+                        "browser.cache.offline.enable" = FALSE,
+                        "network.http.use-cache" = FALSE,
+                        "network.cookie.cookieBehavior" = 2
+                    )
+                ),
+                `moz:firefoxOptions` = list(args = list("--headless"))
             )
     )
 
