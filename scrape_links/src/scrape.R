@@ -118,6 +118,7 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
     repeat{
         page_load <- browser$getPageSource()[[1]]
         page_load_error <- try(page_load, silent = T)
+        
         if(str_detect(page_load_error, "subscript out of bounds")) {
             cat("BROwSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.\n")
         } else {
@@ -158,9 +159,8 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
         browser$setTimeout(type = "implicit", milliseconds = 0)
         searchBtn[[1]]$clickElement()
         cat("CLICKED SEARCH BUTTON AFTER UNAUTHORIZED REQUEST\n")
-    } else{
-        cat("NO UNAUTHORIZED REQUEST ERROR\n")
     }
+    cat("NO UNAUTHORIZED REQUEST ERROR\n")
     
     # Waiting for the page to load.
     repeat{
@@ -181,7 +181,6 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
             next
         }
     }
-    cat("SEARCH HAS CONCLUDED\n")
     
     # A box will appear telling us if there are too many cases to display.
     too_many_cases_box <-
