@@ -115,12 +115,24 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
     searchBtn$clickElement()
     cat("CLICKED SEARCH BUTTON\n")
     
+    repeat{
+        page_load <- browser$getPageSource()[[1]]
+        page_load_error <- try(page_load, silent = T)
+        if(str_detect(page_load_error, "subscript out of bounds")) {
+            cat("BROwSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.\n")
+        } else {
+            break
+        }
+    }
+    cat("PAGE SUCCESSFULLY LOADED\n")
+    
     # Unauthorized request HTTP error.
     unauthorized_request <-
         browser$getPageSource()[[1]] %>%
         read_html() %>%
         html_nodes("pre") %>%
         html_text()
+    cat("CHECKING FOR UNAUTHORIZED REQUEST HTTP 429 ERROR...\n")
     
     # If we do receive the unauthorized request error...
     if(length(unauthorized_request) != 0) {
@@ -146,29 +158,27 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
         browser$setTimeout(type = "implicit", milliseconds = 0)
         searchBtn[[1]]$clickElement()
         cat("CLICKED SEARCH BUTTON AFTER UNAUTHORIZED REQUEST\n")
+    } else{
+        cat("NO UNAUTHORIZED REQUEST ERROR\n")
     }
     
     # Waiting for the page to load.
     repeat{
-        # Sometimes the web page errors. Code executes before page fully loads.
+        # Sometimes the table of cases does not fully load.
         court_cases_df <-
-            try(
-                browser$getPageSource()[[1]] %>%
-                    read_html() %>%
-                    html_elements("#caseSearchResultGrid") %>%
-                    html_table(),
-                silent = T
-            )
-
-        if(class(court_cases_df) == "list") {
-            if(length(court_cases_df) != 0) {
-                break
-            # If the table is empty, an error won't be thrown.
-            } else {
-                next
-            }
+            browser$getPageSource()[[1]] %>%
+            read_html() %>%
+            html_elements("#caseSearchResultGrid") %>%
+            html_table()
+        cat("ATTEMPTING TO RETRIEVE TABLE OF COURT CASES...\n")
+        
+        if(length(court_cases_df) != 0) {
+            cat("RETRIEVED TABLE OF COURT CASES\n")
+            break
+        # If the table is empty, page did not load fully.
         } else {
-            cat("BROwSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.\n")
+            cat("TABLE OF COURT CASES DID NOT FULLY LOAD. TRYING AGAIN\n")
+            next
         }
     }
     cat("SEARCH HAS CONCLUDED\n")
