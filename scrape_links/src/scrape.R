@@ -191,8 +191,8 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
             if(length(court_cases_df) != 0) {
                 cat("RETRIEVED TABLE OF COURT CASES\n")
                 break
-                # An empty table does not cause an error.
-                # Keep trying until the page fully loads.
+            # An empty table does not cause an error.
+            # Keep trying until the page fully loads.
             } else {
                 cat("TABLE OF COURT CASES DID NOT FULLY LOAD. TRYING AGAIN\n")
                 next
