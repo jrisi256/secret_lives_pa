@@ -115,25 +115,36 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
     searchBtn$clickElement()
     cat("CLICKED SEARCH BUTTON\n")
     
+    # Checking for unauthorized request HTTP 429 error.
     repeat{
-        page_load <- browser$getPageSource()[[1]]
-        page_load_error <- try(page_load, silent = T)
+        # Odd error where page source is empty. Code executes before page loads?
+        unauthorized_request <-
+            try(
+                unauthorized_request <-
+                    browser$getPageSource()[[1]] %>%
+                    read_html() %>%
+                    html_nodes("pre") %>%
+                    html_text(),
+                silent = T
+            )
         
-        if(str_detect(page_load_error, "subscript out of bounds")) {
-            cat("BROwSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.\n")
+        # If we detect an unauthorized request or encounter page source error...
+        if(length(unauthorized_request) != 0) {
+            # Detected unauthorized request error. Break out of loop.
+            if(!str_detect(unauthorized_request, "subscript out of bounds")) {
+                cat("CHECKING FOR UNAUTHORIZED REQUEST HTTP 429 ERROR...\n")
+                break
+            # Detected page source error. Try again.
+            } else {
+                cat("BROWSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.\n")
+                next
+            }
+        # No errors detected.
         } else {
+            cat("CHECKING FOR UNAUTHORIZED REQUEST HTTP 429 ERROR...\n")
             break
         }
     }
-    cat("PAGE SUCCESSFULLY LOADED\n")
-    
-    # Unauthorized request HTTP error.
-    unauthorized_request <-
-        browser$getPageSource()[[1]] %>%
-        read_html() %>%
-        html_nodes("pre") %>%
-        html_text()
-    cat("CHECKING FOR UNAUTHORIZED REQUEST HTTP 429 ERROR...\n")
     
     # If we do receive the unauthorized request error...
     if(length(unauthorized_request) != 0) {
@@ -162,23 +173,32 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
     }
     cat("NO UNAUTHORIZED REQUEST ERROR\n")
     
-    # Waiting for the page to load.
+    # Waiting for the table of court cases to load.
     repeat{
-        # Sometimes the table of cases does not fully load.
+        # Again getPageSource is sometimes empty. Odd it would error here after
+        # checking for this error when checking for unauthorized requests.
         court_cases_df <-
-            browser$getPageSource()[[1]] %>%
-            read_html() %>%
-            html_elements("#caseSearchResultGrid") %>%
-            html_table()
+            try(
+                browser$getPageSource()[[1]] %>%
+                    read_html() %>%
+                    html_elements("#caseSearchResultGrid") %>%
+                    html_table(),
+                silent = T
+            )
         cat("ATTEMPTING TO RETRIEVE TABLE OF COURT CASES...\n")
         
-        if(length(court_cases_df) != 0) {
-            cat("RETRIEVED TABLE OF COURT CASES\n")
-            break
-        # If the table is empty, page did not load fully.
+        if(class(court_cases_df) == "list") {
+            if(length(court_cases_df) != 0) {
+                cat("RETRIEVED TABLE OF COURT CASES\n")
+                break
+                # An empty table does not cause an error.
+                # Keep trying until the page fully loads.
+            } else {
+                cat("TABLE OF COURT CASES DID NOT FULLY LOAD. TRYING AGAIN\n")
+                next
+            }
         } else {
-            cat("TABLE OF COURT CASES DID NOT FULLY LOAD. TRYING AGAIN\n")
-            next
+            cat("BROwSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.\n")
         }
     }
     
