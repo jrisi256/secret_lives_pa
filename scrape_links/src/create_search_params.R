@@ -140,7 +140,7 @@ if(path_to_log_file == "") {
     # Read in the log file and keep only those searches that had too many cases.
     log_file <-
         read_csv(path_to_log_file) %>%
-        filter(too_many_cases) %>%
+        filter(too_many) %>%
         group_by(county) %>%
         summarise(begin_date = min(begin_date)) %>%
         mutate(end_date = "2024-01-01")
