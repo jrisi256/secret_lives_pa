@@ -24,7 +24,7 @@ create_date_range <- function(s_date_str_init, browser, day_increment, cutoff_da
     while(T) {
         # If the new start date is past the cutoff, stop constructing dates.
         if(s_date >= ymd(cutoff_date)) {
-            return(list(begin_dates = begin_dates, end_dates = end_dates))
+            return(list(begin_date = begin_dates, end_date = end_dates))
         }
         
         # format day
