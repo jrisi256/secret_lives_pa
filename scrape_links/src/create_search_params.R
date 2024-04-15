@@ -72,7 +72,7 @@ create_date_range <- function(s_date_str_init, browser, day_increment, cutoff_da
         
         # Since our end date was past the cutoff date, we are done.
         if(cutoff_flag) {
-            return(list(begin_dates = begin_dates, end_dates = end_dates))
+            return(list(begin_date = begin_dates, end_date = end_dates))
         }
         
         # update our beginning date
