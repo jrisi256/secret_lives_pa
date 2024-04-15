@@ -17,14 +17,17 @@ remote_driver <-
         port = 4545L,
         chromever = NULL,
         extraCapabilities =
-            makeFirefoxProfile(
-                list(
-                    "browser.cache.disk.enable" = FALSE,
-                    "browser.cache.memory.enable" = FALSE,
-                    "browser.cache.offline.enable" = FALSE,
-                    "network.http.use-cache" = FALSE,
-                    "network.cookie.cookieBehavior" = 2
-                )
+            list(
+                makeFirefoxProfile(
+                    list(
+                        "browser.cache.disk.enable" = FALSE,
+                        "browser.cache.memory.enable" = FALSE,
+                        "browser.cache.offline.enable" = FALSE,
+                        "network.http.use-cache" = FALSE,
+                        "network.cookie.cookieBehavior" = 2
+                    )
+                ),
+                `moz:firefoxOptions` = list(args = list("--headless"))
             )
     )
 rd_client <- remote_driver[["client"]]
@@ -136,12 +139,36 @@ scrape_download_links <- function(start_date, end_date, browser) {
     browser$findElements("id", "btnSearch")[[1]]$clickElement()
     cat("CLICKED SEARCH BUTTON\n")
     
-    # Unauthorized request HTTP error.
-    unauthorized_request <-
-        browser$getPageSource()[[1]] %>%
-        read_html() %>%
-        html_nodes("pre") %>%
-        html_text()
+    # Checking for unauthorized request HTTP 429 error.
+    repeat{
+        # Odd error where page source is empty. Code executes before page loads?
+        unauthorized_request <-
+            try(
+                unauthorized_request <-
+                    browser$getPageSource()[[1]] %>%
+                    read_html() %>%
+                    html_nodes("pre") %>%
+                    html_text(),
+                silent = T
+            )
+        
+        # If we detect an unauthorized request or encounter page source error...
+        if(length(unauthorized_request) != 0) {
+            # Detected unauthorized request error. Break out of loop.
+            if(!str_detect(unauthorized_request, "subscript out of bounds")) {
+                cat("CHECKING FOR UNAUTHORIZED REQUEST HTTP 429 ERROR...\n")
+                break
+                # Detected page source error. Try again.
+            } else {
+                cat("BROWSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.\n")
+                next
+            }
+            # No errors detected.
+        } else {
+            cat("CHECKING FOR UNAUTHORIZED REQUEST HTTP 429 ERROR...\n")
+            break
+        }
+    }
     
     # If we do receive the unauthorized request error...
     if(length(unauthorized_request) != 0) {
@@ -168,10 +195,12 @@ scrape_download_links <- function(start_date, end_date, browser) {
         searchBtn[[1]]$clickElement()
         cat("CLICKED SEARCH BUTTON AFTER UNAUTHORIZED REQUEST\n")
     }
+    cat("NO UNAUTHORIZED REQUEST ERROR\n")
     
-    # Waiting for the page to load.
+    # Waiting for the table of court cases to load.
     repeat{
-        # Sometimes the web page errors. Code executes before page fully loads.
+        # Again getPageSource is sometimes empty. Odd it would error here after
+        # checking for this error when checking for unauthorized requests.
         court_cases_df <-
             try(
                 browser$getPageSource()[[1]] %>%
@@ -180,19 +209,22 @@ scrape_download_links <- function(start_date, end_date, browser) {
                     html_table(),
                 silent = T
             )
+        cat("ATTEMPTING TO RETRIEVE TABLE OF COURT CASES...\n")
         
         if(class(court_cases_df) == "list") {
             if(length(court_cases_df) != 0) {
+                cat("RETRIEVED TABLE OF COURT CASES\n")
                 break
-            # If the table is empty, an error won't be thrown.
+                # An empty table does not cause an error.
+                # Keep trying until the page fully loads.
             } else {
+                cat("TABLE OF COURT CASES DID NOT FULLY LOAD. TRYING AGAIN\n")
                 next
             }
         } else {
             cat("BROwSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.\n")
         }
     }
-    cat("SEARCH HAS CONCLUDED\n")
     
     # Check if there are any cases for the given date range.
     court_cases_df <- court_cases_df[[1]]
