@@ -166,7 +166,8 @@ if(path_to_log_file == "") {
             }
         ) %>%
         bind_rows() %>%
-        left_join(county_df, by = "county")
+        left_join(county_df, by = "county") %>%
+        mutate(begin_date = unlist(begin_date), end_date = unlist(end_date))
 }
 
 #################################################################
