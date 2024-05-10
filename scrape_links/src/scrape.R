@@ -185,7 +185,6 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
                     html_table(),
                 silent = T
             )
-        cat("ATTEMPTING TO RETRIEVE TABLE OF COURT CASES...\n")
         
         if(class(court_cases_df) == "list") {
             if(length(court_cases_df) != 0) {
@@ -194,7 +193,6 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
             # An empty table does not cause an error.
             # Keep trying until the page fully loads.
             } else {
-                cat("TABLE OF COURT CASES DID NOT FULLY LOAD. TRYING AGAIN\n")
                 next
             }
         } else {
@@ -332,17 +330,9 @@ scrape_cases_by_county <- function(df, target_county, browser, scrape_dir, log_d
     }
     end_time <- Sys.time()
     time_scrape <- end_time - start_time
-    nr_tables_scraped <- df %>% filter(!too_many_cases_flag) %>% nrow()
         
     cat(
-        paste0(
-            "TIME IT TOOK TO SCRAPE ",
-            nr_tables_scraped,
-            " TABLES: ",
-            time_scrape,
-            " ",
-            units(time_scrape)
-        )
+        paste0("TIME IT TOOK TO SCRAPE: ", time_scrape, " ", units(time_scrape))
     )
 }
 

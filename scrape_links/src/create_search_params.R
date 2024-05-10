@@ -124,9 +124,9 @@ if(path_to_log_file == "") {
         expand_grid(
             date =
                 paste0(
-                    unlist(date_range$begin_dates),
+                    unlist(date_range$begin_date),
                     "_",
-                    unlist(date_range$end_dates)
+                    unlist(date_range$end_date)
                 ),
             county = paste0(counties_vec, "_", county_ids_vec)
         ) %>%
