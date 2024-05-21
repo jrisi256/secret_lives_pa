@@ -48,8 +48,8 @@ remote_driver <-
                         "network.http.use-cache" = FALSE,
                         "network.cookie.cookieBehavior" = 2
                     )
-                ),
-                `moz:firefoxOptions` = list(args = list("--headless"))
+                )#,
+                #`moz:firefoxOptions` = list(args = list("--headless"))
             )
     )
 
@@ -221,16 +221,28 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
 
         # Collect PDF download links if there are PDFs to download.
         if(no_results != "No results found") {
-            check_length <- c()
+            check_length <- -1
+            docket_sheets <- c()
+            court_summaries <- c()
             
             # Ensure the table and links have properly loaded.
-            while(nrow(court_cases_df) != length(check_length)) {
-                links <-
+            while(nrow(court_cases_df) != check_length) {
+                docket_sheets <- c()
+                court_summaries <- c()
+                
+                table <-
                     browser$getPageSource()[[1]] %>%
                     read_html() %>%
-                    html_nodes('a') %>%
-                    html_attr('href')
-                check_length <- str_subset(links, "DocketSheet")
+                    html_elements("#caseSearchResultGrid tbody tr")
+                
+                for(row in table) {
+                    links <- row %>% html_elements("a.icon-wrapper") %>% html_attr("href")
+                    docket_sheet <- links[1]
+                    court_summary <- links[2]
+                    docket_sheets <- c(docket_sheets, docket_sheet)
+                    court_summaries <- c(court_summaries, court_summary)
+                }
+                check_length <- length(docket_sheets)
                 
                 court_cases_df <-
                     browser$getPageSource()[[1]] %>%
@@ -243,8 +255,8 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
             
             # Scrape the table and the links.
             durl <- "https://ujsportal.pacourts.us"
-            docket_sheet_links <- paste0(durl, str_subset(links, 'DocketSheet'))
-            court_summary_links <- paste0(durl, str_subset(links, 'CourtSummary'))
+            docket_sheet_links <- paste0(durl, docket_sheets)
+            court_summary_links <- paste0(durl, court_summaries)
             
             court_cases_df <-
                 court_cases_df[-c(1, 2, 19)] %>%
