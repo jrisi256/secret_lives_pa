@@ -48,8 +48,8 @@ remote_driver <-
                         "network.http.use-cache" = FALSE,
                         "network.cookie.cookieBehavior" = 2
                     )
-                )#,
-                #`moz:firefoxOptions` = list(args = list("--headless"))
+                ),
+                `moz:firefoxOptions` = list(args = list("--headless"))
             )
     )
 
