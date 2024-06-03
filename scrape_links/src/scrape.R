@@ -193,6 +193,7 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
             # An empty table does not cause an error.
             # Keep trying until the page fully loads.
             } else {
+                cat("TABLE IS EMPTY. PAGE HAS NOT FULLY LOADED. TRY AGAIN.\n")
                 next
             }
         } else {
