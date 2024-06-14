@@ -4,16 +4,27 @@ library(purrr)
 library(readr)
 library(stringr)
 library(R.utils)
-library(lubridate)
 library(data.table)
-path <- here("scrape_links", "output")
+read_path <- here("scrape_links", "output", "scraped_tables")
+out_path <- here("download_pdfs", "output")
 
-dirs <- list.dirs(here("scrape_links", "output"))
-files <- list.files(dirs, full.names = T)
+# Extract the contents of all the zipped files
+tar_files <- list.files(read_path, full.names = T)
+tar_files <- tar_files[!str_detect(tar_files, "csv")]
+walk(
+    tar_files,
+    function(tar_file, path) {untar(tar_file, exdir = path)},
+    path = read_path
+)
+
+# Get list of all court case tables
+files <- list.files(read_path, full.names = T)
 csv_files <- files[str_detect(files, "csv")]
 
+# Read in all court cases
 court_cases <- map(csv_files, function(csv, path) {fread(csv)})
 
+# Combine all court cases into one table
 court_cases_df <-
     map(court_cases,
         function(df) {
@@ -31,5 +42,6 @@ court_cases_df <-
     ) %>%
     bind_rows()
 
-write_csv(court_cases_df, file.path(path, "court_cases_df.csv"))
-gzip(file.path(path, "court_cases_df.csv"), overwrite = T)
+# Write out all court cases
+write_csv(court_cases_df, file.path(out_path, "court_cases_df.csv"))
+gzip(file.path(out_path, "court_cases_df.csv"), overwrite = T)
