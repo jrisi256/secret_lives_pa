@@ -212,6 +212,8 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
     if(length(too_many_cases_box) != 0) {
         too_many_cases <- T
         cat("THERE ARE TOO MANY CASES\n")
+    } else {
+        cat("THERE ARE NOT TOO MANY CASES. PROCEEDING TO SCRAPE TABLE.\n")
     }
     
     # If there are not too many cases, scrape the table of court cases.
@@ -251,6 +253,7 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
                     html_elements("#caseSearchResultGrid") %>%
                     html_table()
                 court_cases_df <- court_cases_df[[1]]
+                cat("TABLE HAS NOT FULLY LOADED. TRYING AGAIN.\n")
             }
             cat("COURT CASES AND LINKS HAVE FULLY LOADED\n")
             
