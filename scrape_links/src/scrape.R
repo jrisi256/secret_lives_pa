@@ -177,7 +177,7 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
     repeat{
         # Again getPageSource is sometimes empty. Odd it would error here after
         # checking for this error when checking for unauthorized requests.
-        court_cases_df <-
+        court_cases <-
             try(
                 browser$getPageSource()[[1]] %>%
                     read_html() %>%
@@ -186,17 +186,26 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
                 silent = T
             )
         
-        if(class(court_cases_df) == "list") {
-            if(length(court_cases_df) != 0) {
-                cat("RETRIEVED TABLE OF COURT CASES\n")
-                break
-            # An empty table does not cause an error.
-            # Keep trying until the page fully loads.
+        # Test that we find the table.
+        if(class(court_cases) == "list") {
+            # Test that the table is not empty.
+            if(length(court_cases) == 1) {
+                # Test that the table is a data frame.
+                if(!is.null(nrow(court_cases[[1]]))) {
+                    # Test that the data frame is not empty.
+                    if(nrow(court_cases) != 0) {
+                        cat("RETRIEVED TABLE OF COURT CASES\n")
+                        break
+                    }
+                }
             } else {
+                # An empty table does not cause an error.
+                # Keep trying until the page fully loads.
                 cat("TABLE IS EMPTY. PAGE HAS NOT FULLY LOADED. TRY AGAIN.\n")
                 next
             }
         } else {
+            # Table was not found likely due to the page not fully loading.
             cat("BROwSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.\n")
         }
     }
@@ -219,8 +228,8 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
     # If there are not too many cases, scrape the table of court cases.
     if(!too_many_cases) {
         # Check if there are any cases for the given date range.
-        court_cases_df <- court_cases_df[[1]]
-        no_results <- court_cases_df[[1,1]]
+        court_cases_df <- court_cases[[1]]
+        no_results <- court_cases_df[[1, 1]]
 
         # Collect PDF download links if there are PDFs to download.
         if(no_results != "No results found") {
@@ -247,12 +256,12 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
                 }
                 check_length <- length(docket_sheets)
                 
-                court_cases_df <-
+                court_cases <-
                     browser$getPageSource()[[1]] %>%
                     read_html() %>%
                     html_elements("#caseSearchResultGrid") %>%
                     html_table()
-                court_cases_df <- court_cases_df[[1]]
+                court_cases_df <- court_cases[[1]]
                 cat("TABLE HAS NOT FULLY LOADED. TRYING AGAIN.\n")
             }
             cat("COURT CASES AND LINKS HAVE FULLY LOADED\n")
