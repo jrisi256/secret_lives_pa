@@ -217,7 +217,7 @@ scrape_download_links <- function(start_date, end_date, browser) {
                 # Test that the table is a data frame.
                 if(!is.null(nrow(court_cases[[1]]))) {
                     # Test that the data frame is not empty.
-                    if(nrow(court_cases) != 0) {
+                    if(nrow(court_cases[[1]]) != 0) {
                         cat("RETRIEVED TABLE OF COURT CASES\n")
                         break
                     }
