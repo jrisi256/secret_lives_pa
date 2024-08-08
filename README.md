@@ -22,7 +22,7 @@ The workflow for scraping goes like this:
     
 6. Additionally, there are some Bash shell scripts. The **run_scraper.sh** shell script was used on the Penn State ROAR Collab computing cluster to submit our programming request as a Slurm job. The **zip.sh** shell script was used to zip all the scraped tables together into one zipped file every each scrape. The name of the zipped file was changed in the script after every scrape to match the date range used.
 
-7. Finally, one last thing to note. I have commented our the *binary* argument in the RSelenium function call. This is because it is usually not necessary when running the script on one's local computer. On the Penn State ROAR Collab computing cluster, we had to provide the path to the browser, though.
+7. Finally, one last thing to note. I have commented out the *binary* argument in the RSelenium function call. This is because it is usually not necessary when running the script on one's local computer. On the Penn State ROAR Collab computing cluster, we had to provide the path to the browser, though.
 
 ## 3. Scrape all remaining counties and date ranges using 0 days
 
