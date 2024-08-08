@@ -321,7 +321,7 @@ remote_driver$server$stop()
 ##################################################################
 ##                         Save results                         ##
 ##################################################################
-scraped_table_dir <- here("scrape_links", "output", "scraped_tables")
+scraped_table_dir <- here("output", "scraped_tables")
 if(!dir.exists(scraped_table_dir)) {dir.create(scraped_table_dir, recursive = T)}
 
 write_csv(

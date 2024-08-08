@@ -1,4 +1,3 @@
-library(here)
 library(dplyr)
 library(rvest)
 library(purrr)
@@ -9,9 +8,10 @@ library(RSelenium)
 ##################################################################
 ##              Set up directories and file names.              ##
 ##################################################################
-search_table_dir <- here("scrape_links", "output", "search_tables")
-log_table_dir <- here("scrape_links", "output", "log_tables")
-scraped_table_dir <- here("scrape_links", "output", "scraped_tables")
+main_dir <- file.path("/storage", "work", "jbr5835", "secret_lives_pa")
+search_table_dir <- file.path(main_dir, "output", "search_tables")
+log_table_dir <- file.path(main_dir, "output", "log_tables")
+scraped_table_dir <- file.path(main_dir, "output", "scraped_tables")
 if(!dir.exists(scraped_table_dir)) {dir.create(scraped_table_dir, recursive = T)}
 if(!dir.exists(log_table_dir)) {dir.create(log_table_dir, recursive = T)}
 
@@ -23,10 +23,10 @@ search_table_name <- "all_counties_6_months.csv"
 ##################################################################
 ##      Read in search table and compare against log file.      ##
 ##################################################################
-search_table <- read_csv(here(search_table_dir, search_table_name))
+search_table <- read_csv(file.path(search_table_dir, search_table_name))
 
-if(file.exists(here(log_table_dir, log_file))) {
-    log_table <- read_csv(here(log_table_dir, log_file))
+if(file.exists(file.path(log_table_dir, log_file))) {
+    log_table <- read_csv(file.path(log_table_dir, log_file))
     search_table <- search_table %>% anti_join(log_table)
 }
 
@@ -39,19 +39,26 @@ remote_driver <-
         port = 4545L,
         chromever = NULL,
         extraCapabilities =
-            list(
-                makeFirefoxProfile(
-                    list(
-                        "browser.cache.disk.enable" = FALSE,
-                        "browser.cache.memory.enable" = FALSE,
-                        "browser.cache.offline.enable" = FALSE,
-                        "network.http.use-cache" = FALSE,
-                        "network.cookie.cookieBehavior" = 2
-                    )
-                ),
-                `moz:firefoxOptions` = list(args = list("--headless"))
-            )
-    )
+          list(
+            makeFirefoxProfile(
+              list(
+                "browser.cache.disk.enable" = FALSE,
+                "browser.cache.memory.enable" = FALSE,
+                "browser.cache.offline.enable" = FALSE,
+                "network.http.use-cache" = FALSE,
+                "network.cookie.cookieBehavior" = 2
+              )
+            ),
+            `moz:firefoxOptions` =
+              list(
+                # binary =
+                #   file.path(
+                #     "/storage", "icds", "tools", "sw", "firefox", "firefox"
+                #   ),
+                args = list("--headless")
+              )
+          )
+      )
 
 rd_client <- remote_driver[["client"]]
 
@@ -130,53 +137,46 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
         
         # If we detect an unauthorized request or encounter page source error...
         if(length(unauthorized_request) != 0) {
-            # Detected unauthorized request error. Break out of loop.
+            # Detected unauthorized request error.
             if(!str_detect(unauthorized_request, "subscript out of bounds")) {
-                cat("CHECKING FOR UNAUTHORIZED REQUEST HTTP 429 ERROR...\n")
-                break
+                cat("UNAUTHORIZED REQUEST\n")
+                searchBtn <- list()
+                
+                # Go through recovery process to get back to scraping.
+                while(length(searchBtn) == 0) {
+                    # Refresh the page.
+                    browser$refresh()
+                    cat("REFRESHED BROWSER\n")
+                    
+                    # Accept the modal dialog pop-up box.
+                    browser$acceptAlert()
+                    cat("ACCEPTED DIALOG BOX\n")
+                    
+                    # Look for the search button.
+                    browser$setTimeout(type = "implicit", milliseconds = 20000)
+                    searchBtn <- browser$findElements("id", "btnSearch")
+                }
+                
+                # Once the search button has loaded, click it.
+                browser$setTimeout(type = "implicit", milliseconds = 0)
+                searchBtn[[1]]$clickElement()
+                cat("CLICKED SEARCH BUTTON AFTER UNAUTHORIZED REQUEST\n")
             # Detected page source error. Try again.
             } else {
-                cat("BROWSER PAGE SOURCE ERROR. WAITING FOR PAGE TO LOAD.\n")
-                next
+                cat("SOURCE ERROR WHILE LOOKING FOR UNAUTHORIZED REQUESTS.\n")
             }
         # No errors detected.
         } else {
-            cat("CHECKING FOR UNAUTHORIZED REQUEST HTTP 429 ERROR...\n")
+            cat("NO UNAUTHORIZED REQUEST ERROR\n")
             break
         }
     }
     
-    # If we do receive the unauthorized request error...
-    if(length(unauthorized_request) != 0) {
-        cat("UNAUTHORIZED REQUEST\n")
-        searchBtn <- list()
-        
-        # Go through recovery process to get back to scraping.
-        while(length(searchBtn) == 0) {
-            # Refresh the page.
-            browser$refresh()
-            cat("REFRESHED BROWSER\n")
-            
-            # Accept the modal dialog pop-up box.
-            browser$acceptAlert()
-            cat("ACCEPTED DIALOG BOX\n")
-            
-            # Look for the search button.
-            browser$setTimeout(type = "implicit", milliseconds = 20000)
-            searchBtn <- browser$findElements("id", "btnSearch")
-        }
-        
-        # Once the search button has loaded, click it.
-        browser$setTimeout(type = "implicit", milliseconds = 0)
-        searchBtn[[1]]$clickElement()
-        cat("CLICKED SEARCH BUTTON AFTER UNAUTHORIZED REQUEST\n")
-    }
-    cat("NO UNAUTHORIZED REQUEST ERROR\n")
-    
     # Waiting for the table of court cases to load.
+    table_empty_counter <- 0
     repeat{
-        # Again getPageSource is sometimes empty. Odd it would error here after
-        # checking for this error when checking for unauthorized requests.
+        # Again, getPageSource() is sometimes empty. Odd it would error here
+        # after checking for this error when checking for unauthorized requests.
         court_cases <-
             try(
                 browser$getPageSource()[[1]] %>%
@@ -199,10 +199,21 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
                     }
                 }
             } else {
-                # An empty table does not cause an error.
-                # Keep trying until the page fully loads.
-                cat("TABLE IS EMPTY. PAGE HAS NOT FULLY LOADED. TRY AGAIN.\n")
-                next
+                # Empty table doesn't cause an error. Try again.
+                if(table_empty_counter <= 150) {
+                    cat("TABLE IS EMPTY. HAS NOT FULLY LOADED. TRY AGAIN.\n")
+                    table_empty_counter <- table_empty_counter + 1
+                # Sometimes the page is just blank, never loads. Not sure why.
+                } else {
+                    cat("EMPTY PAGE ERROR. TRYING TO RELOAD PAGE.")
+                    table_empty_counter <- 0
+                    
+                    browser$refresh()
+                    cat("REFRESHED BROWSER - EMPTY PAGE\n")
+                    
+                    browser$acceptAlert()
+                    cat("ACCEPTED DIALOG BOX - EMPTY PAGE\n")
+                }
             }
         } else {
             # Table was not found likely due to the page not fully loading.
@@ -216,7 +227,7 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
             using="xpath",
             value="/html[1]/body[1]/div[3]/div[3]/div[1]/div[3]/table[1]/caption[1]"
         )
-
+    
     # If the length is not 0, the box appeared. There are too many cases.
     if(length(too_many_cases_box) != 0) {
         too_many_cases <- T
@@ -248,7 +259,11 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
                     html_elements("#caseSearchResultGrid tbody tr")
                 
                 for(row in table) {
-                    links <- row %>% html_elements("a.icon-wrapper") %>% html_attr("href")
+                    links <-
+                        row %>%
+                        html_elements("a.icon-wrapper") %>%
+                        html_attr("href")
+                    
                     docket_sheet <- links[1]
                     court_summary <- links[2]
                     docket_sheets <- c(docket_sheets, docket_sheet)
@@ -289,7 +304,7 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
         # Save the table of cases.
         write_csv(
             court_cases_df,
-            here(
+            file.path(
                 save_dir,
                 paste0(county_name, "_", start_date, "_", end_date, ".csv")
             ),
@@ -368,10 +383,10 @@ counties_list <- as.list(sort(unique(search_table$county)))
 
 progress_files_list <-
     as.list(
-        here(
-            "scrape_links",
-            "output",
-            paste0(sort(unique(search_table$county)), "_", progress_file)
+        file.path(
+          main_dir,
+          "output",
+          paste0(sort(unique(search_table$county)), "_", progress_file)
         )
     )
 
@@ -381,7 +396,7 @@ pwalk(
     df = search_table,
     browser = rd_client,
     scrape_dir = scraped_table_dir,
-    log_dir = here(log_table_dir, log_file)
+    log_dir = file.path(log_table_dir, log_file)
 )
 
 #################################################################

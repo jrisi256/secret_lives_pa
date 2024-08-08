@@ -173,6 +173,6 @@ if(path_to_log_file == "") {
 #################################################################
 ##                 Write out search parameters                 ##
 #################################################################
-save_dir <- here("scrape_links", "output", "search_tables")
+save_dir <- here("output", "search_tables")
 if(!dir.exists(save_dir)) {dir.create(save_dir, recursive = T)}
 write_csv(county_and_dates, here(save_dir, search_table_name))
