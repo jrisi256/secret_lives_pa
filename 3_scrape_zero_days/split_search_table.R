@@ -4,7 +4,7 @@ library(dplyr)
 library(readr)
 
 # Read in the search table.
-search_table_dir <- here("scrape_links", "search_tables")
+search_table_dir <- here("output", "search_tables")
 search_table_name <- "all_counties_0_days"
 search_table <-
     read_csv(file.path(search_table_dir, paste0(search_table_name, ".csv")))

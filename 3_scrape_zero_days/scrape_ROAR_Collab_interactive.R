@@ -386,7 +386,6 @@ progress_files_list <-
     as.list(
         file.path(
           main_dir,
-          "scrape_links",
           "output",
           paste0(sort(unique(search_table$county)), "_", progress_file)
         )
