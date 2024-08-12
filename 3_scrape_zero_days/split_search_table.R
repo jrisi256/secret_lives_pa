@@ -3,14 +3,16 @@ library(purrr)
 library(dplyr)
 library(readr)
 
-# Read in the search table.
+#################################################################
+##  INITIALIZE STARTING VALUES. MAKE SURE TO CHANGE EACH RUN.  ##
+#################################################################
 search_table_dir <- here("output", "search_tables")
-search_table_name <- "all_counties_0_days"
+search_table_name <- "all_counties_0_days_too_many_cases"
 search_table <-
     read_csv(file.path(search_table_dir, paste0(search_table_name, ".csv")))
 
 # Determine how many chunks to split the data into.
-max_nr_searches <- 48 * 60 * 60 / 13
+max_nr_searches <- 48 * 60 * 60 / 20
 nr_groups <- ceiling(nrow(search_table) / max_nr_searches)
 
 # Split the search table up into chunks.
