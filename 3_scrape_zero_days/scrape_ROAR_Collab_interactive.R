@@ -206,7 +206,7 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
                     table_empty_counter <- table_empty_counter + 1
                 # Sometimes the page is just blank, never loads. Not sure why.
                 } else {
-                    cat("EMPTY PAGE ERROR. TRYING TO RELOAD PAGE.")
+                    cat("EMPTY PAGE ERROR. TRYING TO RELOAD PAGE.\n")
                     table_empty_counter <- 0
                     
                     browser$refresh()
