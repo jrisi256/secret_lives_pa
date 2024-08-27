@@ -77,48 +77,10 @@ rd_client$findElement(
     value = "/html[1]/body[1]/div[3]/div[2]/div[1]/form[1]/div[1]/div[2]/select[1]/option[7]"
 )$clickElement()
 
-############################################################################
-##  Scrape the table of cases for a given date range for a given county.  ##
-############################################################################
-scrape_table <- function(start_date, end_date, county_name, county_id, browser, save_dir) {
-    too_many_cases <- F
-    
-    cat(paste0("START DATE: ", start_date, "\n"))
-    cat(paste0("END DATE: ", end_date, "\n"))
-    cat(paste0("COUNTY: ", county_name, "\n"))
-    
-    # Click on advanced search check box
-    browser$findElements("name", "AdvanceSearch")[[1]]$clickElement()
-    cat("CLICKED ADVANCE SEARCH TEXT BOX\n")
-    
-    # Enter start dates and end dates
-    sdate_box <- browser$findElement(using = "name", value = "FiledStartDate")
-    sdate_box$sendKeysToElement(list(start_date))
-    cat("ENTERED START DATE\n")
-    
-    enddate_box <- browser$findElement(using = "name", value = "FiledEndDate")
-    enddate_box$sendKeysToElement(list(end_date))
-    cat("ENTERED END DATE\n")
-    
-    # Click on county selection drop-down menu
-    browser$findElement(
-        using = "xpath",
-        value = "/html[1]/body[1]/div[3]/div[2]/div[1]/form[1]/div[10]/div[2]/select[1]"
-    )$clickElement()
-    cat("CLICKED ON COUNTY SELECTION DROP DOWN\n")
-    
-    # Select the correct county
-    browser$findElement(
-        using="xpath",
-        value =
-            paste0(
-                "/html[1]/body[1]/div[3]/div[2]/div[1]/form[1]/div[10]/div[2]/select[1]/option[",
-                county_id,
-                "]"
-            )
-        )$clickElement()
-    cat("SELECTED COUNTY\n")
-    
+##################################################################
+##             Functions for navigating the website             ##
+##################################################################
+click_search_button <- function(browser) {
     # Search for court cases
     searchBtn <- browser$findElements("id", "btnSearch")[[1]]
     searchBtn$clickElement()
@@ -163,17 +125,19 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
                 browser$setTimeout(type = "implicit", milliseconds = 0)
                 searchBtn[[1]]$clickElement()
                 cat("CLICKED SEARCH BUTTON AFTER UNAUTHORIZED REQUEST\n")
-            # Detected page source error. Try again.
+                # Detected page source error. Try again.
             } else {
                 cat("SOURCE ERROR WHILE LOOKING FOR UNAUTHORIZED REQUESTS.\n")
             }
-        # No errors detected.
+            # No errors detected.
         } else {
             cat("NO UNAUTHORIZED REQUEST ERROR\n")
             break
         }
     }
-    
+}
+
+check_table_loaded_properly <- function(browser) {
     # Waiting for the table of court cases to load.
     table_empty_counter <- 0
     repeat{
@@ -205,7 +169,7 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
                 if(table_empty_counter <= 150) {
                     cat("TABLE IS EMPTY. HAS NOT FULLY LOADED. TRY AGAIN.\n")
                     table_empty_counter <- table_empty_counter + 1
-                # Sometimes the page is just blank, never loads. Not sure why.
+                    # Sometimes the page is just blank, never loads. Not sure why.
                 } else {
                     cat("EMPTY PAGE ERROR. TRYING TO RELOAD PAGE.\n")
                     table_empty_counter <- 0
@@ -223,6 +187,116 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
         }
     }
     
+    return(court_cases)
+}
+
+extract_table <- function(browser, court_cases_df, start_date, end_date) {
+    check_length <- -1
+    docket_sheets <- c()
+    court_summaries <- c()
+    
+    # Ensure the table and links have properly loaded.
+    while(nrow(court_cases_df) != check_length) {
+        docket_sheets <- c()
+        court_summaries <- c()
+        
+        table <-
+            browser$getPageSource()[[1]] %>%
+            read_html() %>%
+            html_elements("#caseSearchResultGrid tbody tr")
+        
+        for(row in table) {
+            links <-
+                row %>%
+                html_elements("a.icon-wrapper") %>%
+                html_attr("href")
+            
+            docket_sheet <- links[1]
+            court_summary <- links[2]
+            docket_sheets <- c(docket_sheets, docket_sheet)
+            court_summaries <- c(court_summaries, court_summary)
+        }
+        check_length <- length(docket_sheets)
+        
+        court_cases <-
+            browser$getPageSource()[[1]] %>%
+            read_html() %>%
+            html_elements("#caseSearchResultGrid") %>%
+            html_table()
+        court_cases_df <- court_cases[[1]]
+        cat("TABLE HAS NOT FULLY LOADED. TRYING AGAIN.\n")
+    }
+    cat("COURT CASES AND LINKS HAVE FULLY LOADED\n")
+    
+    # Scrape the table and the links.
+    durl <- "https://ujsportal.pacourts.us"
+    docket_sheet_links <- paste0(durl, docket_sheets)
+    court_summary_links <- paste0(durl, court_summaries)
+    
+    court_cases_df <-
+        court_cases_df[-c(1, 2, 19)] %>%
+        mutate(
+            start_date = start_date,
+            end_date = end_date,
+            docket_sheet_link = docket_sheet_links,
+            court_summary_link = court_summary_links
+        )
+    
+    return(court_cases_df)
+}
+
+############################################################################
+##  Scrape the table of cases for a given date range for a given county.  ##
+############################################################################
+scrape_table <- function(start_date, end_date, county_name, county_id, browser, save_dir) {
+    too_many_cases <- F
+    cp_too_many_cases <- F
+    mdjs_too_many_cases <- F
+    too_many_cases_text <- ""
+    too_many_cases_type <- "'"
+    
+    cat(paste0("START DATE: ", start_date, "\n"))
+    cat(paste0("END DATE: ", end_date, "\n"))
+    cat(paste0("COUNTY: ", county_name, "\n"))
+    
+    # Click on advanced search check box
+    browser$findElements("name", "AdvanceSearch")[[1]]$clickElement()
+    cat("CLICKED ADVANCE SEARCH TEXT BOX\n")
+    
+    # Enter start dates and end dates
+    sdate_box <- browser$findElement(using = "name", value = "FiledStartDate")
+    sdate_box$sendKeysToElement(list(start_date))
+    cat("ENTERED START DATE\n")
+    
+    enddate_box <- browser$findElement(using = "name", value = "FiledEndDate")
+    enddate_box$sendKeysToElement(list(end_date))
+    cat("ENTERED END DATE\n")
+    
+    # Click on county selection drop-down menu
+    browser$findElement(
+        using = "xpath",
+        value = "/html[1]/body[1]/div[3]/div[2]/div[1]/form[1]/div[10]/div[2]/select[1]"
+    )$clickElement()
+    cat("CLICKED ON COUNTY SELECTION DROP DOWN\n")
+    
+    # Select the correct county
+    browser$findElement(
+        using="xpath",
+        value =
+            paste0(
+                "/html[1]/body[1]/div[3]/div[2]/div[1]/form[1]/div[10]/div[2]/select[1]/option[",
+                county_id,
+                "]"
+            )
+        )$clickElement()
+    cat("SELECTED COUNTY\n")
+    
+    # Click the search button while doing proper error checking.
+    click_search_button(browser)
+    
+    # Make sure table of court cases loaded properly.
+    court_cases <- check_table_loaded_properly(browser)
+    
     # A box will appear telling us if there are too many cases to display.
     too_many_cases_box <-
         browser$findElements(
@@ -233,69 +307,45 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
     # If the length is not 0, the box appeared. There are too many cases.
     if(length(too_many_cases_box) != 0) {
         too_many_cases <- T
-        cat("THERE ARE TOO MANY CASES\n")
+        
+        too_many_cases_text <-
+            browser$getPageSource()[[1]] %>%
+            read_html() %>%
+            html_elements(
+                xpath = "/html/body/div[3]/div[3]/div[1]/div[3]/table/caption"
+            ) %>%
+            html_text()
+        
+        # Determine which court has too many cases: common pleas or magisterial.
+        too_many_cases_type <-
+            case_when(
+                str_detect(too_many_cases_text, "Common Pleas") &
+                    str_detect(too_many_cases_text, "Magisterial") ~ "cp_mc",
+                str_detect(too_many_cases_text, "Magisterial") ~ "mc",
+                str_detect(too_many_cases_text, "Common Pleas") ~ "cp"
+            )
     } else {
         cat("THERE ARE NOT TOO MANY CASES. PROCEEDING TO SCRAPE TABLE.\n")
     }
     
-    # If there are not too many cases, scrape the table of court cases.
-    if(!too_many_cases) {
+    # If there are not too many cases or if there are too many court of common plea cases. 
+    if(!too_many_cases | too_many_cases_type == "cp") {
+        
+        # Flag if there were too many court of common plea cases.
+        if(too_many_cases_type == "cp") {
+            cp_too_many_cases <- T
+            cat("THERE ARE TOO MANY COURT OF COMMON PLEA CASES.\n")
+        }
+        
         # Check if there are any cases for the given date range.
         court_cases_df <- court_cases[[1]]
         no_results <- court_cases_df[[1, 1]]
 
         # Collect PDF download links if there are PDFs to download.
         if(no_results != "No results found") {
-            check_length <- -1
-            docket_sheets <- c()
-            court_summaries <- c()
-            
-            # Ensure the table and links have properly loaded.
-            while(nrow(court_cases_df) != check_length) {
-                docket_sheets <- c()
-                court_summaries <- c()
-                
-                table <-
-                    browser$getPageSource()[[1]] %>%
-                    read_html() %>%
-                    html_elements("#caseSearchResultGrid tbody tr")
-                
-                for(row in table) {
-                    links <-
-                        row %>%
-                        html_elements("a.icon-wrapper") %>%
-                        html_attr("href")
-                    
-                    docket_sheet <- links[1]
-                    court_summary <- links[2]
-                    docket_sheets <- c(docket_sheets, docket_sheet)
-                    court_summaries <- c(court_summaries, court_summary)
-                }
-                check_length <- length(docket_sheets)
-                
-                court_cases <-
-                    browser$getPageSource()[[1]] %>%
-                    read_html() %>%
-                    html_elements("#caseSearchResultGrid") %>%
-                    html_table()
-                court_cases_df <- court_cases[[1]]
-                cat("TABLE HAS NOT FULLY LOADED. TRYING AGAIN.\n")
-            }
-            cat("COURT CASES AND LINKS HAVE FULLY LOADED\n")
-            
-            # Scrape the table and the links.
-            durl <- "https://ujsportal.pacourts.us"
-            docket_sheet_links <- paste0(durl, docket_sheets)
-            court_summary_links <- paste0(durl, court_summaries)
-            
-            court_cases_df <-
-                court_cases_df[-c(1, 2, 19)] %>%
-                mutate(
-                    start_date = start_date,
-                    end_date = end_date,
-                    docket_sheet_link = docket_sheet_links,
-                    court_summary_link = court_summary_links
-                )
+            # Extract the table for downloading.
+            court_cases_df <- extract_table(browser, court_cases_df, start_date, end_date)
+        # There were no court cases.
         } else {
             court_cases_df <-
                 court_cases_df[-c(1, 2, 19)] %>%
@@ -309,21 +359,190 @@ scrape_table <- function(start_date, end_date, county_name, county_id, browser, 
             file.path(
                 save_dir,
                 paste0(county_name, "_", start_date, "_", end_date, ".csv")
-            ),
-            progress = F
+            )
         )
         cat("SCRAPED TABLE OF COURT CASES\n")
-    } else {
-        if(county %in% c("")) {
-            # look for calendar event types...
-        } else {
-            # look by MDJS court office
+    }
+    
+    # If there are too many magisterial cases, go through each MDJS court office.
+    if (str_detect(too_many_cases_type, "mc")) {
+        cat("THERE ARE TOO MANY MAGISTERIAL COURT CASES.\n")
+        
+        # If there are also too many common plea cases, turn on the flag.
+        if(str_detect(too_many_cases_type, "cp")) {
+            cp_too_many_cases <- T
+            cat("THERE ARE TOO MANY COURT OF COMMON PLEA CASES.\n")
+        }
+        
+        # First, find all court of common plea offices.
+        checkboxes <-
+            rd_client$getPageSource()[[1]] %>%
+            read_html() %>%
+            html_elements(
+                xpath = "/html/body/div[3]/div[3]/div[1]/div[2]/div/div[2]/div[4]/div[2]"
+            ) %>%
+            html_elements(
+                css = "label"
+            )
+        checkboxes_text <- checkboxes %>% html_text()
+        cp_office_checkboxes <- str_detect(checkboxes_text, "CP-")
+        cat("FOUND ALL COURT OF COMMON PLEA COURT OFFICES.\n")
+        
+        # un-select select all
+        rd_client$findElement(
+            using = "xpath",
+            value = "/html/body/div[3]/div[3]/div[1]/div[2]/div/div[2]/div[4]/div[2]/label[1]"
+        )$clickElement()
+        cat("DE-SELECTED THE SELECT ALL CHECKBOX.\n")
+        
+        # Go through each common plea office check box.
+        for(checkbox in 1:length(checkboxes)) {
+            if(cp_office_checkboxes[checkbox]) {
+                # Select the court office in the check box menu.
+                rd_client$findElement(
+                    using="xpath",
+                    value = 
+                        paste0(
+                            "/html/body/div[3]/div[3]/div[1]/div[2]/div/div[2]/div[4]/div[2]/label[",
+                            checkbox,
+                            "]"
+                        )
+                )$clickElement()
+                cat(paste0("SELECTED ", checkboxes_text[checkbox], ".\n"))
+                
+                # Extract the table for downloading.
+                court_cases_df <- extract_table(browser, court_cases[[1]], start_date, end_date)
+                
+                # Save the table of cases.
+                write_csv(
+                    court_cases_df,
+                    file.path(
+                        save_dir,
+                        paste0(
+                            county_name, "_", start_date, "_", end_date, "_",
+                            checkboxes_text[checkbox], ".csv"
+                        )
+                    )
+                )
+                cat("SCRAPED TABLE OF COURT CASES\n")
+                
+                # deselect the court office in the check-box menu.
+                rd_client$findElement(
+                    using="xpath",
+                    value = 
+                        paste0(
+                            "/html/body/div[3]/div[3]/div[1]/div[2]/div/div[2]/div[4]/div[2]/label[",
+                            checkbox,
+                            "]"
+                        )
+                )$clickElement()
+                cat("DE-SELECTED ", checkboxes_text[checkbox], ".\n\n")
+            }
+        }
+        
+        # Now that we have all CP court cases, Search by MDJS Court office.
+        mdjs_court_offices <-
+            browser$getPageSource()[[1]] %>%
+            read_html() %>%
+            html_elements(
+                xpath = "/html/body/div[3]/div[2]/div/form/div[12]/div[2]/select"
+            ) %>%
+            html_elements(css = "option")
+        
+        # We skip the first office since it is always blank (all offices).
+        for(court_office in 2:length(mdjs_court_offices)) {
+            # Click on the drop-down menu for MDJS Court offices.
+            browser$findElement(
+                using = "xpath",
+                value = "/html/body/div[3]/div[2]/div/form/div[12]/div[2]/select"
+            )$clickElement()
+            cat("SELECTED MDJS COURT OFFICE DROPDOWN\n")
+            
+            # Select the court office in the drop-down menu.
+            browser$findElement(
+                using="xpath",
+                value = 
+                    paste0(
+                        "/html/body/div[3]/div[2]/div/form/div[12]/div[2]/select/option[",
+                        court_office,
+                        "]"
+                    )
+            )$clickElement()
+            cat(paste0("SELECTED ", court_office, " MDJS COURT OFFICE OPTION.\n"))
+            
+            # Click the search button.
+            click_search_button(browser)
+            
+            # Make sure table of court cases loaded properly.
+            court_cases <- check_table_loaded_properly(browser)
+            
+            # A box will appear telling us if there are too many cases to display.
+            mdjs_too_many_cases_box <-
+                browser$findElements(
+                    using="xpath",
+                    value="/html[1]/body[1]/div[3]/div[3]/div[1]/div[3]/table[1]/caption[1]"
+                )
+            
+            # If the length is not 0, the box appeared. There are too many cases.
+            if(length(mdjs_too_many_cases_box) != 0) {
+                mdjs_too_many_cases <- T
+                cat("THERE ARE TOO MANY MDJS CASES\n")
+            } else {
+                cat("THERE ARE NOT TOO MANY MDJS CASES. PROCEEDING TO SCRAPE TABLE.\n")
+            }
+            
+            # If there are not too many cases, scrape the table of court cases.
+            if(!mdjs_too_many_cases) {
+                # Check if there are any cases for the given date range.
+                court_cases_df <- court_cases[[1]]
+                no_results <- court_cases_df[[1, 1]]
+                
+                # Collect PDF download links if there are PDFs to download.
+                if(no_results != "No results found") {
+                    # Extract the table for downloading.
+                    court_cases_df <- extract_table(browser, court_cases_df, start_date, end_date)
+                # There were no court cases for this county + date + office.
+                } else {
+                    court_cases_df <-
+                        court_cases_df[-c(1, 2, 19)] %>%
+                        mutate(start_date = start_date, end_date = end_date)
+                    cat("NO COURT CASES IN THIS TIME RANGE FOR THIS COUNTY + MDJS OFFICE\n")
+                }
+                
+                # Save the table of cases.
+                write_csv(
+                    court_cases_df,
+                    file.path(
+                        save_dir,
+                        paste0(
+                            county_name, "_", start_date, "_", end_date, "_",
+                            court_office, ".csv"
+                        )
+                    )
+                )
+                cat("SCRAPED TABLE OF COURT CASES\n\n")
+            # If there are still too many cases within a court office, skip.
+            } else {
+                break
+            }
         }
     }
     
     # Reset the search field
     browser$findElements("id", "btnReset")[[1]]$clickElement()
     cat("RESET THE SEARCH FIELD\n\n")
+    
+    return(
+        tibble(
+            start_date = start_date,
+            end_date = end_date,
+            county_name = county_name,
+            county_id = county_id,
+            too_many_cases = too_many_cases,
+            mdjs_too_many_cases = mdjs_too_many_cases,
+            cp_too_many_cases = cp_too_many_cases
+        )
+    )
 }
 
 #################################################################
@@ -340,20 +559,27 @@ scrape_cases_by_county <- function(df, target_county, browser, scrape_dir, log_d
     # For each pair of dates in the current county...
     for(i in 1:nrow(df)) {
         # Scrape the table of court cases.
-        pwalk(
-            list(
-                start_date = as.list(df$begin_date)[i],
-                end_date = as.list(df$end_date)[i],
-                county_name = as.list(df$county)[i],
-                county_id = as.list(df$county_id)[i]
-            ),
+        too_many_cases_list <-
+            pmap(
+                list(
+                    start_date = as.list(df$begin_date)[i],
+                    end_date = as.list(df$end_date)[i],
+                    county_name = as.list(df$county)[i],
+                    county_id = as.list(df$county_id)[i]
+                ),
             scrape_table,
             browser = browser,
             save_dir = scrape_dir
         )
-        
+
         # Save results to the log file.
-        result <- df[i, ]
+        result <-
+            df[i,] %>%
+            mutate(
+                too_many = too_many_cases_list[[1]]$too_many_cases,
+                mdjs_too_many = too_many_cases_list[[1]]$mdjs_too_many_cases,
+                cp_too_many = too_many_cases_list[[1]]$cp_too_many_cases
+            )
         
         write_csv(
             result,
@@ -398,62 +624,3 @@ pwalk(
 ##                        Close driver.                        ##
 #################################################################
 remote_driver$server$stop()
-
-#################################################################
-##                        TESTING TESING TES                   ##
-#################################################################
-
-test2 <-
-    rd_client$getPageSource()[[1]] %>%
-    read_html() %>%
-    html_elements(xpath = "/html/body/div[3]/div[2]/div/form/div[12]/div[2]/select") %>%
-    html_elements(css = "option")
-
-browser$findElement(
-    using = "xpath",
-    value = "/html[1]/body[1]/div[3]/div[2]/div[1]/form[1]/div[10]/div[2]/select[1]"
-)$clickElement()
-cat("CLICKED ON COUNTY SELECTION DROP DOWN\n")
-
-# Select the correct county
-browser$findElement(
-    using="xpath",
-    value =
-        paste0(
-            "/html[1]/body[1]/div[3]/div[2]/div[1]/form[1]/div[10]/div[2]/select[1]/option[",
-            county_id,
-            "]"
-        )
-)$clickElement()
-cat("SELECTED COUNTY\n")
-
-# Select the correct county
-browser$findElement(
-    using="xpath",
-    value =
-        paste0(
-            "/html[1]/body[1]/div[3]/div[2]/div[1]/form[1]/div[10]/div[2]/select[1]/option[",
-            county_id,
-            "]"
-        )
-)$clickElement()
-cat("SELECTED COUNTY\n")
-
-for(court_office in 1:length(test2)) {
-   
-    rd_client$findElement(
-        using = "xpath",
-        value = "/html/body/div[3]/div[2]/div/form/div[12]/div[2]/select"
-    )$clickElement()
-    
-    rd_client$findElement(
-        using="xpath",
-        value = 
-            paste0(
-                "/html/body/div[3]/div[2]/div/form/div[12]/div[2]/select/option[",
-                court_office,
-                "]"
-            )
-    )$clickElement()
-    Sys.sleep(1)
-}
