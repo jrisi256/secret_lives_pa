@@ -30,7 +30,7 @@ The workflow for scraping goes like this:
 
 2. The workflow remains largely the same. First, one would run **create_search_params.R** to create the search table. Next, there is a slight change. One would run **split_search_table.R**. This splits the search table into chunks which can be theoretically completed in 48 hours. Next, one would run the scraper **scrape_ROAR_Collab_interactive.R**. It is largely the same as **scrape_ROAR_Collab.R** with only a few key differences. The first difference is that it can extract the chunk number from the provided search table and use that chunk number for the log file and console output. The second difference is that it takes the search table and Selenium port number as runtime arguments. This change was made so we could run multiple scrapers at the same time. One could submit the scraper in separate jobs and just supply the arguments at runtime. An example is provided in **run_scraper_interactive_0.sh**.
 
-## Scrape all remaining counties and date ranges using 0 days but still had too many cases
+## 4. Scrape all remaining counties and date ranges using 0 days but still had too many cases
 
 1. In hindsight, I should have done this a bit better. The previous scrapers would assume that once you hit a date that had too many cases all subsequent dates for that county would also have too many cases. I should have changed it for the 0 day scraper. In any case, it is what it is. All remaining county + date ranges either had too many cases or were skipped in this fashion. The workflow remains largely the same, but the scraper logic has changed quite a bit. I will specify the high-level details here.
 
@@ -39,3 +39,23 @@ The workflow for scraping goes like this:
 3. Next, run **split_search_table.R**. This will take the search table and split it into a series of search tables which can theoretically be completed within 48 hours.
 
 4. Finally, there is **scrape_too_many_cases_ROAR_Collab_interactive.R**. This is the new scraper to deal with county + date searches that have too many cases. We can either have too many **magisterial court cases** or too many **common plea court cases** or both. When there are too many magisterial court cases, we can systematically go through every magisterial court office in the drop-down menu and collect cases this way. However, if there are too many common plea court cases, there is nothing we can do. There is no way to further refine the search to obtain these missing cases. We just collect the table which is returned from the search. If we have too many cases of both kinds, we can still collect all the magisterial court cases but not all the common plea court cases. Much like **scrape_ROAR_Collab_interactive.R**, one can submit the scraper in a Slurm job as seen in **run_scraper_interactive_0_too_many_cases.sh**.
+
+## 5. Scrape all remaining counties and date ranges which had too many MDJS cases
+
+1. There were a tiny number of search entries where it was the case that there were too many cases even when we search within the date + county by MDJS. When this would happen, the scraper would skip that whole county + date. I could have had the scraper collect them (or at least collect as much as we could), but I wanted to check and see if there would be a way to collect all of the cases. As it turns out, there is no way to collect all the cases in these situations. So this is the final scraping step. First, one needs to run **create_search_params_too_many_mdjs.qmd** which will find the problematic search entries and create a search table.
+
+2. Next, one needs to run **remove_cases.R**. This removes all tables which were collected from the problematic entries. When the scraper came across a MDJS entry that had too many cases, it skipped the rest of the MDJS offices in that county. However, those MDJS offices which came before the problematic entry were still collected. To ensure there is no redundancy, we remove these cases and will simply collect them again in the next scrape.
+
+3. Next, one would run **zip_too_many_cases.sh**. There were so many files which needed to be zipped that using the regular tar command did not work. A new modified version of the shell script had to be created to allow for the files to be zipped.
+
+4. Finally, one would run **scrape_too_many_mdjs_cases.R** which will collect the remaining cases from those dates + counties which had too many MDJS cases. Then, one can run **zip.sh** which will zip up the files.
+   1. **NOTE**: During the scrape, for October 4 2019 for Lackawanna county, we were able to obtain every table. This means some cases must have been purged in between scrapes.
+
+## 6. Downloading the PDFs
+
+1. With all the tables and PDF links scraped, one needs to combine all these data tables into one table. Run **create_pdf_download_list.R** which will combine all the individual data tables.
+   1. There are 313,460 data tables that were collected, and together they capture 18,736,590 cases.
+   2. We drop 67,947 records because the scrape for that date range + county yielded no results (i.e., there were no recorded cases during the specific date range in the specific county). This yields 18,668,643 cases.
+   3. Using the **PA Counties Date of Digital Caseload Adoption.pdf**, we filter out cases which were filed before the counties moved to a completely digital caseload. This is because counties do not have the complete record of cases available prior to the adoption of the digital caseload system. The cases that are available digitally prior to the county adopting the digital caseload system represent only a subset of cases heard during the pre-digital time period. We do not know the criteria by which these cases were selected for migration into the digital system. Absent this domain knowledge and absent the full record of cases, there is no way to know how representative these cases are of the cases heard in the pre-digital period. As a result, we drop these cases. This leads to 3,961,349 cases being dropped which leaves us with 14,707,294 cases. Of these 14,707,294, 4,070,587 correspond to criminal cases and 1,012,570 correspond to Landlord/Tenant cases.
+      1. CR = Criminal, CV = Civil, JM = Juvenile Miscellaneous, LT = Landlord/Tenant, MD = Miscellaneous, NT = Non-Traffic, SA = Summary Appeal, SU = Summary, TR = Traffic.
+      2. I am not sure what JV cases are. I suspect they are some sort of Juvenile case. No JV cases have download links to a PDF (meaning none of them have PDFs).
