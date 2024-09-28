@@ -57,6 +57,7 @@ court_cases_df <-
   court_cases_df %>%
   lazy_dt() %>%
   filter(docket_number != "No results found") %>%
+  filter(!str_detect(docket_sheet_link, "NA$")) %>%
   mutate(filing_date = mdy(filing_date)) %>%
   filter(county != "Adams" | filing_date >= mdy("11/22/2004")) %>%
   filter(county != "Allegheny" | filing_date >= mdy("2/28/2006")) %>%
@@ -154,4 +155,8 @@ saveRDS(lt, here("output", "pdf_download_list", "landlord_tenant_cases.rds"))
 saveRDS(other, here("output", "pdf_download_list", "other_cases.rds"))
 
 cr_links <- cr %>% select(docket_sheet_link, court_summary_link)
+lt_links <- lt %>% select(docket_sheet_link, court_summary_link)
+other_links <- other %>% select(docket_sheet_link, court_summary_link)
 write_csv(cr_links, here("output", "pdf_download_list", "criminal_pdf_links.csv"))
+write_csv(lt_links, here("output", "pdf_download_list", "lt_pdf_links.csv"))
+write_csv(other_links, here("output", "pdf_download_list", "other_pdf_links.csv"))
