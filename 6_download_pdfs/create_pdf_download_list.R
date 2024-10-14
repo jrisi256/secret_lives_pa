@@ -16,11 +16,15 @@ tar_files <- files[!str_detect(files, "csv")]
 
 # Unzip tar files.
 table_dir <- here("output", "scraped_tables", "all_tables")
-if(!dir.exists(table_dir)) {dir.create(table_dir)}
+if (!dir.exists(table_dir)) {
+  dir.create(table_dir)
+}
 
 walk(
   tar_files,
-  function(tar_file, path) {untar(tar_file, exdir = path)},
+  function(tar_file, path) {
+    untar(tar_file, exdir = path)
+  },
   path = table_dir
 )
 
@@ -28,7 +32,9 @@ walk(
 csv_files <- list.files(table_dir, full.names = T)
 csv_files <- csv_files[str_detect(csv_files, "csv")]
 csv_files <- c(csv_files, old_csv)
-court_cases <- map(csv_files, function(csv) {fread(csv)})
+court_cases <- map(csv_files, function(csv) {
+  fread(csv)
+})
 
 # Bind together all the court case tables.
 court_cases_df <-
@@ -38,7 +44,9 @@ court_cases_df <-
       df %>%
         as_tibble() %>%
         rename_with(
-          function(col) {tolower(str_replace_all(str_replace_all(str_replace_all(col, " ", "_"), "\\(|\\)|\\?", ""), "#", "nr"))}
+          function(col) {
+            tolower(str_replace_all(str_replace_all(str_replace_all(col, " ", "_"), "\\(|\\)|\\?", ""), "#", "nr"))
+          }
         ) %>%
         mutate(
           across(
@@ -50,7 +58,9 @@ court_cases_df <-
   ) %>%
   bind_rows()
 
-if(!dir.exists(here("output", "pdf_download_list"))) {dir.create(here("output", "pdf_download_list"))}
+if (!dir.exists(here("output", "pdf_download_list"))) {
+  dir.create(here("output", "pdf_download_list"))
+}
 saveRDS(court_cases_df, here("output", "pdf_download_list", "all_cases_no_fltr.rds"))
 
 court_cases_df <-
@@ -144,11 +154,16 @@ court_cases_df <-
     filing_day = day(filing_date),
     filing_wday = wday(filing_date)
   ) %>%
-  as_tibble()
+  as_tibble() %>%
+  select(-event_location, -event_date, -event_status)
 
 cr <- court_cases_df %>% lazy_dt() %>% filter(case_type == "CR") %>% as_tibble()
 lt <- court_cases_df %>% lazy_dt() %>% filter(case_type == "LT") %>% as_tibble()
-other <- court_cases_df %>% lazy_dt() %>% filter(case_type != "LT" & case_type != "CR") %>% as_tibble()
+other <-
+  court_cases_df %>%
+  lazy_dt() %>%
+  filter(case_type != "LT" & case_type != "CR") %>%
+  as_tibble()
 
 saveRDS(cr, here("output", "pdf_download_list", "criminal_cases.rds"))
 saveRDS(lt, here("output", "pdf_download_list", "landlord_tenant_cases.rds"))
