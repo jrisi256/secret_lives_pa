@@ -6,7 +6,7 @@ library(stringr)
 library(data.table)
 
 ################################################################################
-# Set browser and directories.
+# Set directories.
 ################################################################################
 path_to_log_files <- here("output", "log_tables")
 path_to_search_table <- here("output", "search_tables")

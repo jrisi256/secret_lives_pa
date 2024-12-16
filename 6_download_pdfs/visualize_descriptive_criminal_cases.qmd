@@ -1,0 +1,376 @@
+---
+title: "Visualizing descriptive trends from scraper"
+format: pdf
+---
+
+```{r}
+library(here)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+```
+
+```{r}
+criminal_cases <- readRDS(here("output", "pdf_download_list", "criminal_cases.rds"))
+graph_dir <- here("6_download_pdfs", "graphs")
+if(!dir.exists(graph_dir)) {dir.create(graph_dir)}
+```
+
+Reassuringly, judge ID (extracted from docket number) and court office are basically one-to-one matches. This is reassuring because it means the judicial IDs are capturing something meaningful although the information is largely redundant with court office.
+
+We see the number of criminal cases is steadily increasing for nearly every county. Is this because we simply have more data on criminal cases in recent years because they have not been expunged yet? Or is it actually because the number of criminal cases is increasing? The one county which runs counter to this trend is Philadelphia.
+
+One idea Ashley had was to drop all active cases which is an interesting idea and may be worth pursuing to help limit the number of the cases we have to analyze (also these cases would not have any outcomes associated with them).
+
+```{r, fig.height = 12, fig.width = 18}
+number_cases_per_county <- criminal_cases %>% count(county, filing_year)
+
+plot_cases_per_county <-
+    ggplot(number_cases_per_county, aes(x = filing_year, y = n)) +
+    geom_point(aes(color = county)) +
+    geom_line(aes(color = county, group = county)) +
+    theme_bw() +
+    theme(legend.position = "", text = element_text(size = 17)) +
+    facet_wrap(~county, scales = "free") +
+    labs(x = "Filing Year", y = "Number of Criminal Cases")
+
+ggsave(
+    filename = "nr_cases_per_county.png",
+    plot = plot_cases_per_county,
+    path = graph_dir,
+    width = 25,
+    height = 15
+)
+```
+
+We see that in many counties it is primarily one court office that hears most of the cases.
+
+```{r}
+number_cases_per_judge <-
+    criminal_cases %>%
+    count(court_office, filing_year, county)
+
+plot_cases_per_judge <-
+    ggplot(number_cases_per_judge, aes(x = filing_year, y = n)) +
+    geom_point(size = 1) +
+    geom_line(aes(group = court_office)) +
+    theme_bw() +
+    theme(
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        title = element_text(size = 30),
+        axis.text.x = element_text(size = 13),
+        axis.text.y = element_text(size = 13),
+        strip.text = element_text(size = 13)
+    ) +
+    labs(
+        x = "Filing Year",
+        y = "Number of Criminal Cases",
+        title = "Number of criminal cases per court office in each county over time"
+    ) +
+    facet_wrap(~county, scales = "free_y")
+
+ggsave(
+    filename = "nr_cases_per_judge.png",
+    plot = plot_cases_per_judge,
+    path = graph_dir,
+    width = 25,
+    height = 12
+)
+
+prcnt_cases_judge <-
+    criminal_cases %>%
+    count(court_office, county) %>%
+    group_by(county) %>%
+    mutate(
+        prcnt = n / sum(n) * 100,
+        rank = min_rank(desc(prcnt))
+    ) %>%
+    ungroup()
+
+prcnt_cases_judge_plot <-
+    ggplot(prcnt_cases_judge, aes(x = rank, y = prcnt)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~county, scales = "free_x") +
+    theme_bw() +
+    theme(
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 15),
+        strip.text = element_text(size = 17)
+    ) +
+    labs(
+        x = "Rank order of court offices",
+        y = "Percentage of criminal cases heard by a court office"
+    )
+
+ggsave(
+    filename = "prcnt_cases_judge.png",
+    plot = prcnt_cases_judge_plot,
+    path = graph_dir,
+    width = 28,
+    height = 15
+)
+```
+
+Most cases are heard during the weekkdays. There is some variation across counties as to which day is the most popular day for court hearings.
+
+```{r}
+number_cases_per_wkday <- criminal_cases %>% count(filing_wday, county)
+
+plot_cases_per_wkday <-
+    ggplot(number_cases_per_wkday, aes(x = as.character(filing_wday), y = n)) +
+    geom_point(size = 1) +
+    geom_line(aes(group = county)) +
+    theme_bw() +
+    theme(text = element_text(size = 17)) +
+    labs(x = "Filing day of the week", y = "Number of Criminal Cases") +
+    facet_wrap(~county, scales = "free_y")
+
+ggsave(
+    filename = "nr_cases_per_wkday.png",
+    plot = plot_cases_per_wkday,
+    path = graph_dir,
+    width = 25,
+    height = 12
+)
+
+prcnt_cases_wkday <-
+    criminal_cases %>%
+    count(filing_wday, county) %>%
+    group_by(county) %>%
+    mutate(prcnt = n / sum(n) * 100) %>%
+    ungroup()
+
+prcnt_cases_wkday_plot <-
+    ggplot(prcnt_cases_wkday, aes(x = as.character(filing_wday), y = prcnt)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~county) +
+    theme_bw() +
+    theme(text = element_text(size = 20)) +
+    labs(
+        x = "Filing day of the week",
+        y = "Percentage of criminal cases"
+    )
+
+ggsave(
+    filename = "prcnt_cases_wkday.png",
+    plot = prcnt_cases_wkday_plot,
+    path = graph_dir,
+    width = 18,
+    height = 12
+)
+
+prcnt_cases_wkday_by_year <-
+    criminal_cases %>%
+    count(filing_wday, filing_year, county) %>%
+    group_by(filing_year, county) %>%
+    mutate(prcnt = n / sum(n) * 100) %>%
+    ungroup()
+
+prcnt_cases_wkday_by_year_plot <-
+    ggplot(prcnt_cases_wkday_by_year, aes(x = as.character(filing_wday), y = prcnt)) +
+    geom_point(aes(color = filing_year)) +
+    geom_line(aes(color = filing_year, group = filing_year)) +
+    facet_wrap(~county, scale = "free_y") +
+    theme_bw() +
+    theme(text = element_text(size = 20)) +
+    labs(
+        x = "Filing day of the week",
+        y = "Percentage of criminal cases",
+        color = "Filing year"
+    )
+
+ggsave(
+    filename = "prcnt_cases_wkday_by_year.png",
+    plot = prcnt_cases_wkday_by_year_plot,
+    path = graph_dir,
+    width = 18,
+    height = 12
+)
+```
+
+The winter months (January, February, November, December) have generally less criminal cases. It is relatively flat/stable, though.
+
+```{r}
+nr_cases_total <-
+    criminal_cases %>%
+    count(county) %>%
+    mutate(rank = ntile(n, 8))
+
+number_cases_per_month <-
+    criminal_cases %>%
+    full_join(select(nr_cases_total, county, rank), by = "county") %>%
+    count(filing_month, county, rank)
+
+plot_cases_per_month <-
+    ggplot(number_cases_per_month, aes(x = filing_month, y = n)) +
+    geom_point(size = 1, aes(color = county)) +
+    geom_line(aes(group = county, color = county)) +
+    theme_bw() +
+    labs(
+        x = "Filing month",
+        y = "Number of Criminal Cases",
+        title = "Number of criminal cases per month organized by county size"
+    ) +
+    theme(legend.position = "", text = element_text(size = 20)) +
+    scale_x_continuous(breaks = seq(0, 12, 1)) +
+    facet_wrap(~rank, scales = "free_y")
+
+ggsave(
+    filename = "nr_cases_per_month.png",
+    plot = plot_cases_per_month,
+    path = graph_dir,
+    width = 18,
+    height = 12
+)
+
+prcnt_cases_month <-
+    criminal_cases %>%
+    full_join(select(nr_cases_total, county, rank), by = "county") %>%
+    count(filing_month, rank) %>%
+    group_by(rank) %>%
+    mutate(prcnt = n / sum(n) * 100) %>%
+    ungroup()
+
+prcnt_cases_month_plot <-
+    ggplot(prcnt_cases_month, aes(x = filing_month, y = prcnt)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~rank) +
+    theme_bw() +
+    theme(text = element_text(size = 20)) +
+    labs(
+        x = "Filing month",
+        y = "Percentage of cases",
+        title = "Percentage of criminal cases heard each month organized by county size"
+    ) +
+    scale_x_continuous(breaks = seq(0, 12, 1))
+
+ggsave(
+    filename = "prcnt_cases_month.png",
+    plot = prcnt_cases_month_plot,
+    path = graph_dir,
+    width = 18,
+    height = 12
+)
+```
+
+The number of criminal cases is relatively stable at the beginning of a month vs. at the end of the month. However, there is a dip in the number of criminal cases from around days 20 - 26.
+
+```{r}
+number_cases_per_day <-
+    criminal_cases %>%
+    full_join(select(nr_cases_total, county, rank), by = "county") %>%
+    count(filing_day, rank)
+
+plot_cases_per_day <-
+    ggplot(number_cases_per_day, aes(x = filing_day, y = n)) +
+    geom_point(size = 1, aes(color = rank)) +
+    geom_line(aes(group = rank, color = rank)) +
+    theme_bw() +
+    labs(
+        x = "Filing day",
+        y = "Number of Criminal Cases",
+        title = "Number of criminal cases heard each day of the month organized by county size"
+    ) +
+    theme(legend.position = "", text = element_text(size = 20)) +
+    scale_x_continuous(breaks = seq(0, 31, 1))
+
+ggsave(
+    filename = "nr_cases_per_day.png",
+    plot = plot_cases_per_day,
+    path = graph_dir,
+    width = 18,
+    height = 12
+)
+
+prcnt_cases_day <-
+    criminal_cases %>%
+    full_join(select(nr_cases_total, county, rank), by = "county") %>%
+    count(filing_day, rank) %>%
+    group_by(rank) %>%
+    mutate(prcnt = n / sum(n) * 100) %>%
+    ungroup()
+
+prcnt_cases_day_plot <-
+    ggplot(prcnt_cases_day, aes(x = filing_day, y = prcnt)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~rank) +
+    theme_bw() +
+    theme(text = element_text(size = 20)) +
+    labs(
+        x = "Filing day",
+        y = "Percentage of cases",
+        title = "Percentage of criminal cases heard each day of the month organized by county size"
+    )
+
+ggsave(
+    filename = "prcnt_cases_day.png",
+    plot = prcnt_cases_day_plot,
+    path = graph_dir,
+    width = 18,
+    height = 12
+)
+```
+
+The age-defendant curve we all know and love. Note that I calculate age using lubridate's **duration** class rather than their **interval** class. They basically give the same results, but the duration class uses a set definition for **year** where each year has the same number of days whereas the interval class uses calendar years which have a different number of days. Both methods give the same number of days so it just depends on how one wants to convert days into years. I prefer the consistency of the duration class as compared to the arguably more accurate interval class.
+
+```{r}
+time_length(interval(ymd("1980-01-01"), ymd("2014-09-18")), "day")
+time_length(ymd("2014-09-18") - ymd("1980-01-01"), "day")
+
+time_length(interval(ymd("1983-12-31"), ymd("2014-09-18")), "year")
+time_length(ymd("2014-09-18") - ymd("1983-12-31"), "year")
+```
+
+```{r}
+criminal_cases <-
+    criminal_cases %>%
+    mutate(age = time_length(ymd(filing_date) - mdy(date_of_births), "year"))
+
+age_curve <-
+    criminal_cases %>%
+    filter(age >= 0 & age <= 100) %>%
+    ggplot(aes(x = age)) +
+    geom_density(aes(color = filing_year, group = filing_year)) +
+    theme_bw() +
+    theme(
+        axis.text.x = element_text(size = 13),
+        axis.text.y = element_text(size = 13),
+        strip.text = element_text(size = 20),
+        axis.title = element_text(size = 20)
+    ) +
+    labs(x = "Defendant age at time of filing", y = "Density")
+
+age_curve_county <-
+    criminal_cases %>%
+    filter(age >= 0 & age <= 100) %>%
+    ggplot(aes(x = age)) +
+    geom_density(aes(color = filing_year, group = filing_year)) +
+    theme_bw() +
+    theme(
+        axis.text.x = element_text(size = 13),
+        axis.text.y = element_text(size = 13),
+        strip.text = element_text(size = 20),
+        axis.title = element_text(size = 20)
+    ) +
+    labs(x = "Defendant age at time of filing", y = "Density") +
+    facet_wrap(~county)
+
+ggsave(
+    filename = "nr_cases_per_age_per_county.png",
+    plot = age_curve_county,
+    path = graph_dir,
+    width = 18,
+    height = 12
+)
+
+ggsave(
+    filename = "nr_cases_per_age.png",
+    plot = age_curve,
+    path = graph_dir,
+    width = 18,
+    height = 12
+)
+```
