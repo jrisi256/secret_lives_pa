@@ -1,4 +1,5 @@
 import re
+import json
 
 import pandas as pd
 import pdfplumber
@@ -174,7 +175,7 @@ def extract_defendant_information(text: str) -> dict[str, str | None]:
     return extracted_info
 
 
-def extract_charges_MC(text: str) -> pd.DataFrame:
+def extract_charges_MC(text: str) -> dict:
     """Extracts the charges from the CHARGES section for PDFs with _MC_ in name."""
     pattern = re.compile(
         r"(?P<Seq>\d+)\s+(?P<Orig_Seq>\d+)\s+(?P<Grade>\w*)\s+(?P<Statute>\d+\s§\s\d+(?:\s§§\s\w*\**)?|\d+\s§\s\d+)\s+(?P<Statute_Description>.+?)\s+(?P<Offense_Dt>\d{2}/\d{2}/\d{4})\s+(?P<OTN>\w+\s\d+-\d+)",
@@ -192,10 +193,10 @@ def extract_charges_MC(text: str) -> pd.DataFrame:
             "Offense Dt.",
             "OTN",
         ],
-    )
+    ).to_json(orient="records")
 
 
-def extract_charges_MJ(text: str) -> pd.DataFrame:
+def extract_charges_MJ(text: str) -> dict:
     """Extracts the charges from the CHARGES section for PDFs with _MJ_ in name."""
     pattern = re.compile(
         r"(?P<Num>\d)(?P<Charge>\d+\s§\s\d+(?:\s§§\s\w*\**)?(?:\s\w*\s*)?)\s+(?P<Grade>\w*)\s+(?P<Description>.+?)\s+(?P<Offense_Dt>\d{2}/\d{2}/\d{4})\s+(?P<Disposition>.+)",
@@ -205,10 +206,10 @@ def extract_charges_MJ(text: str) -> pd.DataFrame:
     return pd.DataFrame(
         matches,
         columns=["#", "Charge", "Grade", "Description", "Offense Dt.", "Disposition"],
-    )
+    ).to_json(orient="records")
 
 
-def extract_status_information(text: str) -> tuple[str | None, pd.DataFrame]:
+def extract_status_information(text: str) -> tuple[str | None, dict]:
     """Extract the case status from the STATUS INFORMATION section
 
     Args:
@@ -243,10 +244,10 @@ def extract_status_information(text: str) -> tuple[str | None, pd.DataFrame]:
     )
     status_df["processing_status"] = status_df["processing_status"].str.strip()
 
-    return case_status, status_df
+    return case_status, status_df.to_json(orient="records")
 
 
-def extract_calendar_events(text: str) -> pd.DataFrame:
+def extract_calendar_events(text: str) -> dict:
     """
     Extracts calendar events from the CALENDAR EVENTS section.
 
@@ -254,7 +255,7 @@ def extract_calendar_events(text: str) -> pd.DataFrame:
         text (str): The text containing the calendar events.
 
     Returns:
-        pd.DataFrame: A DataFrame containing the extracted events with the following columns:
+        dict: A DataFrame containing the extracted events with the following columns:
         - "event_type" (str): The type of the event.
         - "start_datetime" (str): The start date and time of the event.
         - "room" (str): The room where the event is scheduled.
@@ -338,10 +339,10 @@ def extract_calendar_events(text: str) -> pd.DataFrame:
         columns=["start_datetime", "event_type", "room", "judge", "status"],
     )
 
-    return events_df
+    return events_df.to_json(orient="records")
 
 
-def extract_case_participants(text) -> pd.DataFrame:
+def extract_case_participants(text) -> dict:
     """Extracts the case participants from the CASE PARTICIPANTS section."""
     text = text.strip().split("\n")
     roles, names = [], []
@@ -351,10 +352,10 @@ def extract_case_participants(text) -> pd.DataFrame:
             role, name = parts
             roles.append(role.strip())
             names.append(name.strip())
-    return pd.DataFrame({"role": roles, "name": names})
+    return pd.DataFrame({"role": roles, "name": names}).to_json(orient="records")
 
 
-def extract_docket_entry(text: str, defendant_name: str) -> pd.DataFrame:
+def extract_docket_entry(text: str, defendant_name: str) -> dict:
     """Extracts the docket entries from the DOCKET ENTRY INFORMATION section.
 
     Args:
@@ -362,7 +363,7 @@ def extract_docket_entry(text: str, defendant_name: str) -> pd.DataFrame:
         defendant_name (str): The name of the defendant.
 
     Returns:
-        pd.DataFrame: A DataFrame containing the extracted docket entries with the following columns:
+        dict: A DataFrame containing the extracted docket entries with the following columns:
         - "date" (str): The date of the entry.
         - "entry" (str): The type of the entry.
         - "applies_to" (str): The party to which the entry applies.
@@ -400,10 +401,10 @@ def extract_docket_entry(text: str, defendant_name: str) -> pd.DataFrame:
         filers.append(line)
     return pd.DataFrame(
         {"date": dates, "entry": entries, "applies_to": applies_to, "filer": filers}
-    )
+    ).to_json(orient="records")
 
 
-def extract_attorney_information(text: str) -> pd.DataFrame:
+def extract_attorney_information(text: str) -> dict:
     """Extracts the attorney information from ATTORNEY INFORMATION section."""
     lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
     titles = []
@@ -423,7 +424,7 @@ def extract_attorney_information(text: str) -> pd.DataFrame:
     if len(lines) == 1:
         return pd.DataFrame({"title": titles, "name": [""] * len(titles)})
     names = [name.strip() for name in lines[1].split("Name:") if len(name.strip())]
-    return pd.DataFrame({"title": titles, "name": names})
+    return pd.DataFrame({"title": titles, "name": names}).to_json(orient="records") 
 
 
 def extract_bail(text: str) -> dict[str, str]:
@@ -461,7 +462,7 @@ def extract_bail(text: str) -> dict[str, str]:
     return {"nebbia_status": nebbia_status, "actions": actions}
 
 
-def extract_all(pdf_path: str) -> dict[str, str | pd.DataFrame]:
+def extract_all(pdf_path: str) -> dict[str, str | dict]:
     """Extracts all relevant information from a PDF file."""
     text = extract_text_from_pdf(pdf_path)
     sections = extract_sections(text)
