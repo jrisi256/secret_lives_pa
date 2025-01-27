@@ -157,24 +157,53 @@ court_cases_df <-
   as_tibble() %>%
   select(-event_location, -event_date, -event_status)
 
-cr <- court_cases_df %>% lazy_dt() %>% filter(case_type == "CR") %>% as_tibble()
-lt <- court_cases_df %>% lazy_dt() %>% filter(case_type == "LT") %>% as_tibble()
-other <-
-  court_cases_df %>%
-  lazy_dt() %>%
-  filter(case_type != "LT" & case_type != "CR") %>%
-  as_tibble()
-
+cr <- court_cases_df %>% lazy_dt() %>% filter(case_type == "CR") %>% distinct(docket_number, .keep_all = T) %>% as_tibble()
+lt <- court_cases_df %>% lazy_dt() %>% filter(case_type == "LT") %>% distinct(docket_number, .keep_all = T) %>% as_tibble()
+other <- court_cases_df %>% lazy_dt() %>% filter(case_type != "LT" & case_type != "CR") %>% distinct(docket_number, .keep_all = T) %>% as_tibble()
 saveRDS(cr, here("output", "pdf_download_list", "criminal_cases.rds"))
 saveRDS(lt, here("output", "pdf_download_list", "landlord_tenant_cases.rds"))
 saveRDS(other, here("output", "pdf_download_list", "other_cases.rds"))
 
-cr_links <- cr %>% select(county, docket_number, docket_sheet_link, court_summary_link)
-lt_links <- lt %>% select(county, docket_number, docket_sheet_link, court_summary_link)
-other_links <- other %>% select(county, docket_number, docket_sheet_link, court_summary_link)
+cr_links <-
+    cr %>%
+    select(county, docket_number, docket_sheet_link, court_summary_link) %>%
+    pivot_longer(cols = matches("link"), names_to = "link_type", values_to = "link") %>%
+    mutate(
+        link_type = if_else(link_type == "docket_sheet_link", "ds", "cs"),
+        file_name = paste0(link_type, "_", county, "_", docket_number, ".pdf"),
+        file_name = str_replace_all(file_name, "-", "_"),
+        successfully_scraped = F
+    ) %>%
+    select(file_name, link, successfully_scraped)
 write_csv(cr_links, here("output", "pdf_download_list", "criminal_pdf_links.csv"))
-write_csv(lt_links, here("output", "pdf_download_list", "lt_pdf_links.csv"))
-write_csv(other_links, here("output", "pdf_download_list", "other_pdf_links.csv"))
 gzip(here("output", "pdf_download_list", "criminal_pdf_links.csv"), overwrite = T)
+
+lt_links <-
+    lt %>%
+    select(county, docket_number, docket_sheet_link, court_summary_link) %>%
+    pivot_longer(cols = matches("link"), names_to = "link_type", values_to = "link") %>%
+    mutate(
+        link_type = if_else(link_type == "docket_sheet_link", "ds", "cs"),
+        file_name = paste0(link_type, "_", county, "_", docket_number, ".pdf"),
+        file_name = str_replace_all(file_name, "-", "_"),
+        successfully_scraped = F
+    ) %>%
+    select(file_name, link, successfully_scraped)
+write_csv(lt_links, here("output", "pdf_download_list", "lt_pdf_links.csv"))
 gzip(here("output", "pdf_download_list", "lt_pdf_links.csv"), overwrite = T)
+
+other_links <-
+    other %>%
+    lazy_dt() %>%
+    select(county, docket_number, docket_sheet_link, court_summary_link) %>%
+    pivot_longer(cols = matches("link"), names_to = "link_type", values_to = "link") %>%
+    mutate(
+        link_type = if_else(link_type == "docket_sheet_link", "ds", "cs"),
+        file_name = paste0(link_type, "_", county, "_", docket_number, ".pdf"),
+        file_name = str_replace_all(file_name, "-", "_"),
+        scraped_successfully = F
+    ) %>%
+    select(file_name, link, scraped_successfully) %>%
+    as_tibble()
+write_csv(other_links, here("output", "pdf_download_list", "other_pdf_links.csv"))
 gzip(here("output", "pdf_download_list", "other_pdf_links.csv"), overwrite = T)
