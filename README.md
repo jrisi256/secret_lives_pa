@@ -68,6 +68,7 @@ The workflow for scraping goes like this:
 
 2. The general flow for downloading PDFs goes as follows:
    1. Run **create_log_file.py** and provide two runtime arguments where the first argument is the file name of the *old log file* and the second argument will be the name of the *new log file*. If running for the first time, the second argument does not matter.
-   2. Next, run **download_PDFs.py** and provide as a runtime argument the name of the log file to be used.
+   2. Next, run **download_PDFs.py** and provide as a runtime argument the name of the log file to be used. The second runtime argument should be how many workers 
    3. After **download_PDFs.py** finishes running (e.g., it completes, it crashes, the server closes), run** **create_log_file.py** where the recently used log file will be the *old log file*.
    4. Iterate until all the PDFs are downloaded.
+   5. Running the scripts on ROAR Collab, one can use the shell script provided (e.g., **download_pdfs_2025_02_04.sh**) ensuring to change the run time arguments as appropriate.

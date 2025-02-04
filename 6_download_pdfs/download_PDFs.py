@@ -76,7 +76,7 @@ def visit_url(file_name, url):
     print("Saved results\n")
 
 # Start downloading the PDFs.
-nr_workers = arguments[2]
+nr_workers = int(arguments[2])
 pool = ThreadPool(nr_workers)
 results = pool.starmap(visit_url, zip(cases_df["file_name"], cases_df["link"]))
 pool.close()

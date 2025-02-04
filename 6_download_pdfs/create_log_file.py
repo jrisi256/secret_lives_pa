@@ -5,7 +5,6 @@ import numpy as np
 
 # Initialize paths.
 csv_path = "/home/joe/Documents/secret_lives_pa/output/pdf_download_list/"
-pdf_path = "/home/joe/Documents/secret_lives_pa/output/pdf_download_list/pdfs/"
 
 # Intialize names for files.
 arguments = sys.argv
@@ -26,16 +25,14 @@ if(not os.path.exists(csv_path + pdf_log_file_old)):
     criminal_cases_df = pd.read_csv(
         csv_path + criminal_cases_file,
         compression = "gzip",
-        dtype = {"file_name": str, "link": str, "successfully_scraped": bool},
-        nrows = 20
+        dtype = {"file_name": str, "link": str, "successfully_scraped": bool}
     )
     
     # Read in landlord-tenant cases.
     lt_cases_df = pd.read_csv(
         csv_path + lt_cases_file,
         compression = "gzip",
-        dtype = {"file_name": str, "link": str, "successfully_scraped": bool},
-        nrows = 20
+        dtype = {"file_name": str, "link": str, "successfully_scraped": bool}
     )
 
     # Combine cases.
