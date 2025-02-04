@@ -54,6 +54,7 @@ The workflow for scraping goes like this:
 ## 6. Downloading the PDFs
 
 1. With all the tables and PDF links scraped, one needs to combine all these data tables into one table. Run **create_pdf_download_list.R** which will combine all the individual data tables.
+
    1. There are 313,460 data tables that were collected, and together they capture 18,736,590 cases.
    2. We drop 67,947 records because the scrape for that date range + county yielded no results (i.e., there were no recorded cases during the specific date range in the specific county). This yields 18,668,643 cases.
       1. 1. CR = Criminal, CV = Civil, JM = Juvenile Miscellaneous, LT = Landlord/Tenant, MD = Miscellaneous, NT = Non-Traffic, SA = Summary Appeal, SU = Summary, TR = Traffic.
@@ -64,3 +65,9 @@ The workflow for scraping goes like this:
       2. Criminal cases --> From 4,070,587 cases to 4,046,443 cases.
       3. Landlord/tenant cases --> From 1,012,570 cases to 993,821 cases.
       4. Other cases --> From 9,624,130 cases to 9,314,573 cases.
+
+2. The general flow for downloading PDFs goes as follows:
+   1. Run **create_log_file.py** and provide two runtime arguments where the first argument is the file name of the *old log file* and the second argument will be the name of the *new log file*. If running for the first time, the second argument does not matter.
+   2. Next, run **download_PDFs.py** and provide as a runtime argument the name of the log file to be used.
+   3. After **download_PDFs.py** finishes running (e.g., it completes, it crashes, the server closes), run** **create_log_file.py** where the recently used log file will be the *old log file*.
+   4. Iterate until all the PDFs are downloaded.
