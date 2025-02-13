@@ -99,6 +99,12 @@ def extract_sections(text) -> dict[str, str]:
         # Remove the header from the section text
         section_text = section_text[len(header) :].strip()
 
+        # Reduce different versions of the same header to a single version
+        if "ATTORNEY INFORMATION" in header:
+            header = "ATTORNEY INFORMATION"
+        elif "BAIL INFORMATION" in header:
+            header = "BAIL"
+
         # Add to dictionary
         sections[header] = section_text
 
@@ -176,7 +182,7 @@ def extract_defendant_information(text: str) -> dict[str, str | None]:
 
 
 def extract_charges_MC(text: str) -> dict:
-    """Extracts the charges from the CHARGES section for PDFs with _MC_ in name."""
+    """Extracts the charges from the CHARGES section for PDFs with _MC_ or _CP- in name."""
     pattern = re.compile(
         r"(?P<Seq>\d+)\s+(?P<Orig_Seq>\d+)\s+(?P<Grade>\w*)\s+(?P<Statute>\d+\s§\s\d+(?:\s§§\s\w*\**)?|\d+\s§\s\d+)\s+(?P<Statute_Description>.+?)\s+(?P<Offense_Dt>\d{2}/\d{2}/\d{4})\s+(?P<OTN>\w+\s\d+-\d+)",
         re.MULTILINE,
@@ -417,6 +423,7 @@ def extract_attorney_information(text: str) -> dict:
     """Extracts the attorney information from ATTORNEY INFORMATION section."""
     lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
     titles = []
+    names = []
     stop_mark = -1
     while True:
         for title in attorney_titles:
@@ -428,11 +435,22 @@ def extract_attorney_information(text: str) -> dict:
         if not len(lines[0]):
             break
         if stop_mark >= 1:
-            raise ValueError(f"Unknown attorney title in {lines[0]}")
+            if len(lines[0].split("Name:")) == 0:
+                raise ValueError(f"Unknown attorney title in {lines[0]}")
+            else:
+                names = [name.strip() for name in lines[0].split("Name:") if len(name.strip())]
+                for title in attorney_titles:
+                    if lines[1].startswith(title):
+                        titles.append(title)
+                        lines[1] = lines[1][len(title) :].strip()
+                if len(titles) < len(names):
+                    titles += [""] * (len(names) - len(titles))
+                break
         stop_mark += 1
     if len(lines) == 1:
         return pd.DataFrame({"title": titles, "name": [""] * len(titles)})
-    names = [name.strip() for name in lines[1].split("Name:") if len(name.strip())]
+    if not len(names):
+        names = [name.strip() for name in lines[1].split("Name:") if len(name.strip())]
     return pd.DataFrame({"title": titles, "name": names}).to_json(orient="records") 
 
 
@@ -508,7 +526,7 @@ def extract_all(pdf_path: str) -> dict[str, str | dict]:
         else None
     )
     bail_info = extract_bail(sections.get("BAIL", "")) if "BAIL" in sections else None
-    if "_MC_" in pdf_path:
+    if "_MC_" or "_CP-" in pdf_path:
         charges = (
             extract_charges_MC(sections.get("CHARGES", ""))
             if "CHARGES" in sections
