@@ -231,8 +231,17 @@ def extract_status_information(text: str) -> tuple[str | None, dict]:
     if case_status == "Status":
         case_status = text.split("\n")[1].strip().split()[0]
 
+    arrest_date_pattern = r"Arrest Date\s*:\s*(\d{2}/\d{2}/\d{4})"
+    arrest_date_match = re.search(arrest_date_pattern, text)
+    if arrest_date_match:
+        arrest_date = arrest_date_match.group(1)
+    else:
+        arrest_date = None
+
     # Remove the case status line from the text
     text = re.sub(case_status_pattern, "", text)
+    if arrest_date:
+        text = re.sub(arrest_date, "", text)
 
     # Extract the status date and processing status
     status_pattern = r"(\d{2}/\d{2}/\d{4})\s+(.+)"
@@ -244,7 +253,7 @@ def extract_status_information(text: str) -> tuple[str | None, dict]:
     )
     status_df["processing_status"] = status_df["processing_status"].str.strip()
 
-    return case_status, status_df.to_json(orient="records")
+    return case_status, arrest_date, status_df.to_json(orient="records")
 
 
 def extract_calendar_events(text: str) -> dict:
@@ -471,10 +480,10 @@ def extract_all(pdf_path: str) -> dict[str, str | dict]:
         if "DEFENDANT INFORMATION" in sections
         else None
     )
-    case_status, status_info = (
+    case_status, arrest_date, status_info = (
         extract_status_information(sections.get("STATUS INFORMATION", ""))
         if "STATUS INFORMATION" in sections
-        else (None, None)
+        else (None, None, None)
     )
     calendar_events = (
         extract_calendar_events(sections.get("CALENDAR EVENTS", ""))
@@ -516,6 +525,7 @@ def extract_all(pdf_path: str) -> dict[str, str | dict]:
     return {
         "defendant_info": defendant_info,
         "case_status": case_status,
+        "arrest_date": arrest_date,
         "status_info": status_info,
         "calendar_events": calendar_events,
         "case_participants": case_participants,
