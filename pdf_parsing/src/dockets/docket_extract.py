@@ -424,14 +424,34 @@ def extract_docket_entry(text: str, defendant_name: str) -> dict:
 def extract_entries(text: str) -> dict:
     """Alternative docket entry format in "ENTRIES" sections
     """
-    pattern = r'(\d+)\s+(\d{2}/\d{2}/\d{4})\s+(\d{2}/\d{2}/\d{4})?\s+(.*?)\n\s+(.*?)\n'
+    pattern = r'(\d+)\s+(\d{2}/\d{2}/\d{4})\s+(\d{2}/\d{2}/\d{4})?\s+(.*?)\n\s+(.*?)\n\s+(.*?)\n'
     matches = re.findall(pattern, text, re.DOTALL)
-    seqs, cp_filed_dates, document_dates, names, entry_texts = zip(*matches)
+    cp_filed_dates = []
+    document_dates = []
+    names = []
+    second_rows = []
+    third_rows = []
+    for match in matches:
+        _, cp_filed_date, document_date, name, second_row, third_row = match
+        cp_filed_dates.append(cp_filed_date)
+        document_dates.append(document_date)
+        names.append(name)
+        second_rows.append(second_row)
+        third_rows.append(third_row)
+    entry_texts = []
+    for i, (rowa, rowb) in enumerate(zip(second_rows, third_rows)):
+        date_pattern = re.compile(r'\d{2}/\d{2}/\d{4}')
+        if not date_pattern.search(rowb): 
+            names[i] = names[i] + " " + rowa.strip()
+            entry_texts.append(rowb.strip())
+        else:
+            entry_texts.append(rowa.strip())
+    
     return pd.DataFrame({
         "filed_date": cp_filed_dates,
         "document_date": document_dates,
         "filed_by": names,
-        "entry_text": [et.strip() for et in entry_texts]
+        "entry_text": entry_texts
     }).to_json(orient="records")
 
 
