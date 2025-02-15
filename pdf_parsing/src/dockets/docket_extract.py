@@ -83,6 +83,7 @@ def extract_sections(text) -> dict[str, str]:
         (match.start(), match.group().strip())
         for match in section_header_pattern.finditer(text)
     ]
+    headers = [h for h in headers if len(h[1])]
 
     # Dictionary to store sections
     sections = {}
@@ -106,7 +107,8 @@ def extract_sections(text) -> dict[str, str]:
             header = "BAIL"
 
         # Add to dictionary
-        sections[header] = section_text
+        sections.setdefault(header, "")
+        sections[header] += f"\n{section_text}"
 
     return sections
 
@@ -419,6 +421,20 @@ def extract_docket_entry(text: str, defendant_name: str) -> dict:
     ).to_json(orient="records")
 
 
+def extract_entries(text: str) -> dict:
+    """Alternative docket entry format in "ENTRIES" sections
+    """
+    pattern = r'(\d+)\s+(\d{2}/\d{2}/\d{4})\s+(\d{2}/\d{2}/\d{4})?\s+(.*?)\n\s+(.*?)\n'
+    matches = re.findall(pattern, text, re.DOTALL)
+    seqs, cp_filed_dates, document_dates, names, entry_texts = zip(*matches)
+    return pd.DataFrame({
+        "filed_date": cp_filed_dates,
+        "document_date": document_dates,
+        "filed_by": names,
+        "entry_text": [et.strip() for et in entry_texts]
+    }).to_json(orient="records")
+
+
 def extract_attorney_information(text: str) -> dict:
     """Extracts the attorney information from ATTORNEY INFORMATION section."""
     lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
@@ -518,7 +534,11 @@ def extract_all(pdf_path: str) -> dict[str, str | dict]:
             sections.get("DOCKET ENTRY INFORMATION", ""), defendant_info["name"]
         )
         if "DOCKET ENTRY INFORMATION" in sections and defendant_info.get("name")
+        else extract_entries(
+            sections.get("ENTRIES")
+            if "ENTRIES" in sections
         else None
+        )
     )
     attorney_info = (
         extract_attorney_information(sections.get("ATTORNEY INFORMATION", ""))
