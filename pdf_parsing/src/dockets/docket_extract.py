@@ -422,7 +422,15 @@ def extract_docket_entry(text: str, defendant_name: str) -> dict:
 
 
 def extract_entries(text: str) -> dict:
-    """Alternative docket entry format in "ENTRIES" sections"""
+    """Alternative docket entry format in "ENTRIES" sections.
+    
+    Returns:
+        dict: Containing the extracted docket entries with the following columns:
+        - "filed_date" (str)
+        - "document_date" (str)
+        - "filed_by" (str)
+        - "entry_text" (str)
+    """
     pattern = r"(\d+)\s+(\d{2}/\d{2}/\d{4})\s+(\d{2}/\d{2}/\d{4})?\s+(.*?)\n\s+(.*?)\n\s+(.*?)\n"
     matches = re.findall(pattern, text, re.DOTALL)
     cp_filed_dates = []
@@ -445,9 +453,10 @@ def extract_entries(text: str) -> dict:
     for i, (rowa, rowb) in enumerate(zip(second_rows, third_rows)):
         date_pattern = re.compile(r"\d{2}/\d{2}/\d{4}")
         if not date_pattern.search(rowb):
-            names[i] = names[i] + " " + rowa.strip()
+            names[i] = names[i].strip() + " " + rowa.strip()
             entry_texts.append(rowb.strip())
         else:
+            names[i] = names[i].strip()
             entry_texts.append(rowa.strip())
 
     return pd.DataFrame(
@@ -536,6 +545,20 @@ def extract_bail(text: str) -> dict[str, str]:
 
 def extract_payment_plan_summary(text: str) -> dict:
     """Extract payment plan header, and line items
+
+    Returns:
+        dict: Containing the extracted payment plan summary with the following columns:
+        - "payment_plan_freq" (str)
+        - "next_due_date" (str)
+        - "active" (str)
+        - "overdue_amt" (float)
+        - "suspended" (str)
+        - "next_due_amt" (float)
+        - "payment_plan_lines" (str)
+        where payment_plan_lines are
+        - "date" (str)
+        - "name" (str)
+        - "amount" (float)
     """
     pattern = re.compile(
         r"Payment Plan No\s+Payment Plan Freq\.\s+Next Due Date\s+Active\s+Overdue Amt\s+\n" + \
