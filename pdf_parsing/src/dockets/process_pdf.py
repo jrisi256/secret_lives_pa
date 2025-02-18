@@ -1,5 +1,5 @@
 # Run this file to quickly process a single docket PDF file
-# Run as python quick_start.py <fname.pdf>
+# Run as python process_pdf.py <fname.pdf>
 # The output will be on screen, and in a file <fname.json>
 
 import json
@@ -24,6 +24,6 @@ def main(fname: str) -> None:
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        raise ValueError("Usage: python quick_start.py <fname.pdf>")
+        raise ValueError("Usage: python process_pdf.py <fname.pdf>")
 
     main(sys.argv[1])

@@ -83,6 +83,7 @@ def extract_sections(text) -> dict[str, str]:
         (match.start(), match.group().strip())
         for match in section_header_pattern.finditer(text)
     ]
+    headers = [h for h in headers if len(h[1])]
 
     # Dictionary to store sections
     sections = {}
@@ -99,8 +100,15 @@ def extract_sections(text) -> dict[str, str]:
         # Remove the header from the section text
         section_text = section_text[len(header) :].strip()
 
+        # Reduce different versions of the same header to a single version
+        if "ATTORNEY INFORMATION" in header:
+            header = "ATTORNEY INFORMATION"
+        elif "BAIL INFORMATION" in header:
+            header = "BAIL"
+
         # Add to dictionary
-        sections[header] = section_text
+        sections.setdefault(header, "")
+        sections[header] += f"\n{section_text}"
 
     return sections
 
@@ -176,7 +184,7 @@ def extract_defendant_information(text: str) -> dict[str, str | None]:
 
 
 def extract_charges_MC(text: str) -> dict:
-    """Extracts the charges from the CHARGES section for PDFs with _MC_ in name."""
+    """Extracts the charges from the CHARGES section for PDFs with _MC_ or _CP- in name."""
     pattern = re.compile(
         r"(?P<Seq>\d+)\s+(?P<Orig_Seq>\d+)\s+(?P<Grade>\w*)\s+(?P<Statute>\d+\s§\s\d+(?:\s§§\s\w*\**)?|\d+\s§\s\d+)\s+(?P<Statute_Description>.+?)\s+(?P<Offense_Dt>\d{2}/\d{2}/\d{4})\s+(?P<OTN>\w+\s\d+-\d+)",
         re.MULTILINE,
@@ -231,8 +239,17 @@ def extract_status_information(text: str) -> tuple[str | None, dict]:
     if case_status == "Status":
         case_status = text.split("\n")[1].strip().split()[0]
 
+    arrest_date_pattern = r"Arrest Date\s*:\s*(\d{2}/\d{2}/\d{4})"
+    arrest_date_match = re.search(arrest_date_pattern, text)
+    if arrest_date_match:
+        arrest_date = arrest_date_match.group(1)
+    else:
+        arrest_date = None
+
     # Remove the case status line from the text
     text = re.sub(case_status_pattern, "", text)
+    if arrest_date:
+        text = re.sub(arrest_date, "", text)
 
     # Extract the status date and processing status
     status_pattern = r"(\d{2}/\d{2}/\d{4})\s+(.+)"
@@ -244,7 +261,7 @@ def extract_status_information(text: str) -> tuple[str | None, dict]:
     )
     status_df["processing_status"] = status_df["processing_status"].str.strip()
 
-    return case_status, status_df.to_json(orient="records")
+    return case_status, arrest_date, status_df.to_json(orient="records")
 
 
 def extract_calendar_events(text: str) -> dict:
@@ -404,10 +421,59 @@ def extract_docket_entry(text: str, defendant_name: str) -> dict:
     ).to_json(orient="records")
 
 
+def extract_entries(text: str) -> dict:
+    """Alternative docket entry format in "ENTRIES" sections.
+    
+    Returns:
+        dict: Containing the extracted docket entries with the following columns:
+        - "filed_date" (str)
+        - "document_date" (str)
+        - "filed_by" (str)
+        - "entry_text" (str)
+    """
+    pattern = r"(\d+)\s+(\d{2}/\d{2}/\d{4})\s+(\d{2}/\d{2}/\d{4})?\s+(.*?)\n\s+(.*?)\n\s+(.*?)\n"
+    matches = re.findall(pattern, text, re.DOTALL)
+    cp_filed_dates = []
+    document_dates = []
+    names = []
+    second_rows = []
+    third_rows = []
+    for match in matches:
+        _, cp_filed_date, document_date, name, second_row, third_row = match
+        cp_filed_dates.append(cp_filed_date)
+        document_dates.append(document_date)
+        names.append(name)
+        second_rows.append(second_row)
+        third_rows.append(third_row)
+    entry_texts = []
+
+    # Third row if second row is a continuation of the name
+    # which happens in some cases - if not the third row will be next entry and have a date
+    # Might be brittle?
+    for i, (rowa, rowb) in enumerate(zip(second_rows, third_rows)):
+        date_pattern = re.compile(r"\d{2}/\d{2}/\d{4}")
+        if not date_pattern.search(rowb):
+            names[i] = names[i].strip() + " " + rowa.strip()
+            entry_texts.append(rowb.strip())
+        else:
+            names[i] = names[i].strip()
+            entry_texts.append(rowa.strip())
+
+    return pd.DataFrame(
+        {
+            "filed_date": cp_filed_dates,
+            "document_date": document_dates,
+            "filed_by": names,
+            "entry_text": entry_texts,
+        }
+    ).to_json(orient="records")
+
+
 def extract_attorney_information(text: str) -> dict:
     """Extracts the attorney information from ATTORNEY INFORMATION section."""
     lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
     titles = []
+    names = []
     stop_mark = -1
     while True:
         for title in attorney_titles:
@@ -419,12 +485,27 @@ def extract_attorney_information(text: str) -> dict:
         if not len(lines[0]):
             break
         if stop_mark >= 1:
-            raise ValueError(f"Unknown attorney title in {lines[0]}")
+            if len(lines[0].split("Name:")) == 0:
+                raise ValueError(f"Unknown attorney title in {lines[0]}")
+            else:
+                names = [
+                    name.strip()
+                    for name in lines[0].split("Name:")
+                    if len(name.strip())
+                ]
+                for title in attorney_titles:
+                    if lines[1].startswith(title):
+                        titles.append(title)
+                        lines[1] = lines[1][len(title) :].strip()
+                if len(titles) < len(names):
+                    titles += [""] * (len(names) - len(titles))
+                break
         stop_mark += 1
     if len(lines) == 1:
         return pd.DataFrame({"title": titles, "name": [""] * len(titles)})
-    names = [name.strip() for name in lines[1].split("Name:") if len(name.strip())]
-    return pd.DataFrame({"title": titles, "name": names}).to_json(orient="records") 
+    if not len(names):
+        names = [name.strip() for name in lines[1].split("Name:") if len(name.strip())]
+    return pd.DataFrame({"title": titles, "name": names}).to_json(orient="records")
 
 
 def extract_bail(text: str) -> dict[str, str]:
@@ -462,6 +543,64 @@ def extract_bail(text: str) -> dict[str, str]:
     return {"nebbia_status": nebbia_status, "actions": actions}
 
 
+def extract_payment_plan_summary(text: str) -> dict:
+    """Extract payment plan header, and line items
+
+    Returns:
+        dict: Containing the extracted payment plan summary with the following columns:
+        - "payment_plan_freq" (str)
+        - "next_due_date" (str)
+        - "active" (str)
+        - "overdue_amt" (float)
+        - "suspended" (str)
+        - "next_due_amt" (float)
+        - "payment_plan_lines" (str)
+        where payment_plan_lines are
+        - "date" (str)
+        - "name" (str)
+        - "amount" (float)
+    """
+    pattern = re.compile(
+        r"Payment Plan No\s+Payment Plan Freq\.\s+Next Due Date\s+Active\s+Overdue Amt\s+\n" + \
+        r"\s+Responsible Participant\s+Suspended\s+Next Due Amt\n" + \
+        r"\s+\d+-\d+-\w\d+\s+(?P<payment_plan_freq>\w+)\s+(?P<next_due_date>\d{2}/\d{2}/\d{4})\s+(?P<active>(Yes|No))\s+\$(?P<overdue_amt>[\d,]+\.\d{2})\s+\n" + \
+        r"[\s\w,]+(?P<suspended>(Yes|No))\s+\$(?P<next_due_amt>[\d,]+\.\d{2})"
+    )
+
+    match = pattern.search(text)
+    if match:
+        payment_plan_freq = match.group("payment_plan_freq")
+        next_due_date = match.group("next_due_date")
+        active = match.group("active")
+        overdue_amt = float(match.group("overdue_amt").replace(",", ""))
+        suspended = match.group("suspended")
+        next_due_amt = float(match.group("next_due_amt").replace(",", ""))
+    pattern_payment_lines = re.compile(
+    r"(?P<date>\d{2}/\d{2}/\d{4})\s+Payment(?:\s+(?P<name>.*?))\s+\$(?P<amount>[\d,]+\.\d{2})"
+    )
+    lines = text.splitlines()
+    dates, names, vals = [], [], []
+    for line in lines:
+        match_payment = pattern_payment_lines.search(line)
+        if match_payment:
+            dates.append(match_payment.group("date"))
+            name_val = match_payment.group("name") if match_payment.group("name") else ""
+            names.append(name_val)
+            vals.append(float(match_payment.group("amount").replace(",", "")))
+
+    return {
+        "payment_plan_freq": payment_plan_freq,
+        "next_due_date": next_due_date,
+        "active": active,
+        "overdue_amt": overdue_amt,
+        "suspended": suspended,
+        "next_due_amt": next_due_amt,
+        "payment_plan_lines": pd.DataFrame(
+            {"date": dates, "name": names, "amount": vals}
+            ).to_json(orient="records")
+    }
+
+
 def extract_all(pdf_path: str) -> dict[str, str | dict]:
     """Extracts all relevant information from a PDF file."""
     text = extract_text_from_pdf(pdf_path)
@@ -471,10 +610,10 @@ def extract_all(pdf_path: str) -> dict[str, str | dict]:
         if "DEFENDANT INFORMATION" in sections
         else None
     )
-    case_status, status_info = (
+    case_status, arrest_date, status_info = (
         extract_status_information(sections.get("STATUS INFORMATION", ""))
         if "STATUS INFORMATION" in sections
-        else (None, None)
+        else (None, None, None)
     )
     calendar_events = (
         extract_calendar_events(sections.get("CALENDAR EVENTS", ""))
@@ -491,7 +630,7 @@ def extract_all(pdf_path: str) -> dict[str, str | dict]:
             sections.get("DOCKET ENTRY INFORMATION", ""), defendant_info["name"]
         )
         if "DOCKET ENTRY INFORMATION" in sections and defendant_info.get("name")
-        else None
+        else extract_entries(sections.get("ENTRIES") if "ENTRIES" in sections else None)
     )
     attorney_info = (
         extract_attorney_information(sections.get("ATTORNEY INFORMATION", ""))
@@ -499,7 +638,7 @@ def extract_all(pdf_path: str) -> dict[str, str | dict]:
         else None
     )
     bail_info = extract_bail(sections.get("BAIL", "")) if "BAIL" in sections else None
-    if "_MC_" in pdf_path:
+    if "_MC_" or "_CP-" in pdf_path:
         charges = (
             extract_charges_MC(sections.get("CHARGES", ""))
             if "CHARGES" in sections
@@ -513,9 +652,15 @@ def extract_all(pdf_path: str) -> dict[str, str | dict]:
         )
     else:
         charges = None
+    payment_plan_summary = (
+        extract_payment_plan_summary(sections.get("PAYMENT PLAN SUMMARY", ""))
+        if "PAYMENT PLAN SUMMARY" in sections
+        else None
+    )
     return {
         "defendant_info": defendant_info,
         "case_status": case_status,
+        "arrest_date": arrest_date,
         "status_info": status_info,
         "calendar_events": calendar_events,
         "case_participants": case_participants,
@@ -523,4 +668,5 @@ def extract_all(pdf_path: str) -> dict[str, str | dict]:
         "attorney_info": attorney_info,
         "bail_info": bail_info,
         "charges": charges,
+        "payment_plan_summary": payment_plan_summary,
     }
