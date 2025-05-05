@@ -6,87 +6,70 @@ library(readr)
 library(stringr)
 library(pdftools)
 
+# Set up the PDF directories
 pdf_dir <-
     file.path(
-        "/media", "joe", "4TB SSD", "joe_pdfs", "OneDrive - The Pennsylvania State University",
-        "SecretLives", "Joe's Folder", "pdf_download_list", "pdfs", "pdfs_2025_04_05_p3"
+        "/media", "joe", "T7 Shield", "OneDrive - The Pennsylvania State University",
+        "SecretLives", "Joe's Folder", "pdf_download_list", "pdfs"
     )
 
-new_pdf_dir <-
-    file.path(
-        "/media", "joe", "4TB SSD", "joe_pdfs", "OneDrive - The Pennsylvania State University",
-        "SecretLives", "Joe's Folder", "pdf_download_list", "new_organization"
-    )
+new_pdf_dir <- file.path("/media", "joe", "T7 Shield", "new_pdf_struct")
 
-################################################################################
-# Find and read in all PDF files.
-################################################################################
-pdf_paths <- list.files(path = pdf_dir, full.names = T, recursive = T)
-pdf_filenames <- list.files(path = pdf_dir, full.names = F, recursive = T)
-pdf_success <-
-    map(
-        pdf_paths,
-        function(pdf_path) {
-            attempt <- try(pdf_text(pdf_path))
-            if_else(class(attempt) == "try-error", F, T)
-        }
-    )
+# Find all PDF folders.
+pdf_folders <- list.files(pdf_dir, full.names = T, recursive = F)
 
-################################################################################
-# Create new folder structure to save the PDFs.
-################################################################################
-pdf_paths_df <-
-    tibble(
-        pdf_name = str_replace(pdf_filenames, "pdfs/", ""),
-        date_scraped = "pdfs_2025_04_05_p3",
-        successfully_scraped = unlist(pdf_success),
-        old_path = unlist(pdf_paths)
-    ) %>%
-    ungroup() %>%
-    separate_wider_delim(
-        pdf_name,
-        delim = "_",
-        names =
-            c(
-                "pdf_type", "county", "court_type", "judge_id", "case_type",
-                "case_id", "year"
-            ),
-        cols_remove = F
-    ) %>%
-    mutate(
-        year = str_remove(year, ".pdf"),
-        new_path =
-            if_else(
-                successfully_scraped,
-                file.path(new_pdf_dir, county, year, pdf_type, court_type, case_type, pdf_name),
-                file.path(new_pdf_dir, "junk", pdf_name)
+# For each PDF folder, do the following.
+walk(
+    pdf_folders,
+    function(pdf_path, new_pdf_path) {
+        # Find every PDF file in the current directory.
+        pdf_files <- list.files(path = pdf_path, full.names = F, recursive = T)
+        full_pdf_file_paths <- file.path(pdf_path, pdf_files)
+        
+        # Attempt to read in the PDFs.
+        pdf_success <-
+            map(
+                full_pdf_file_paths,
+                function(pdf_file) {
+                    attempt <- try(pdf_text(pdf_file))
+                    if_else(class(attempt) == "try-error", F, T)
+                }
             )
-    )
-
-# Save PDF results.
-pwalk(
-    list(pdf_paths_df$old_path, pdf_paths_df$new_path),
-    function(old_path, new_path) {
-        if (!dir.exists(dirname(new_path))) dir.create(dirname(new_path), recursive = TRUE) 
-        file.copy(old_path, new_path)
-    }
+        
+        # Create a data frame which tracks if each PDF was successfully scraped.
+        pdf_paths_df <-
+            tibble(
+                pdf_name = str_replace(pdf_files, "pdfs/", ""),
+                date_scraped = str_extract(pdf_path, "pdfs_2025_0[2-4]_[0-9]{2}"),
+                successfully_scraped = unlist(pdf_success),
+                old_path = full_pdf_file_paths
+            ) %>%
+            # Using the name of the PDF, we can generate characteristics of the case.
+            separate_wider_delim(
+                pdf_name,
+                delim = "_",
+                names = c("pdf_type", "county", "court_type", "judge_id", "case_type", "case_id", "year"),
+                cols_remove = F
+            ) %>%
+            # Create new directory to store the PDF based on its characteristics.
+            mutate(
+                year = str_remove(year, ".pdf"),
+                new_path =
+                    if_else(
+                        successfully_scraped,
+                        file.path(new_pdf_path, county, year, pdf_type, court_type, case_type, pdf_name),
+                        file.path(new_pdf_path, "junk", pdf_name)
+                    )
+            )
+        
+        # Move PDFs from their old directory to their new directory.
+        pwalk(
+            list(pdf_paths_df$old_path, pdf_paths_df$new_path),
+            function(old_path, new_path) {
+                if (!dir.exists(dirname(new_path))) dir.create(dirname(new_path), recursive = T) 
+                file.rename(old_path, new_path)
+            }
+        )
+    },
+    new_pdf_path = new_pdf_dir
 )
-
-# Create list of PDFs which were successfully downloaded.
-full_case_list_df<-
-    pdf_paths_df %>%
-    group_by(pdf_name, county, year, pdf_type, court_type, case_type, judge_id, case_id) %>%
-    summarise(successfully_scraped = any(successfully_scraped)) %>%
-    ungroup()
-write_csv(
-    full_case_list_df,
-    file.path(new_pdf_dir, "case_download_status.csv")
-)
-
-# pdf_df <-
-#     tibble(
-#         pdf_name = str_replace(pdf_filenames, "pdfs_2025_0[2-4]_[0-9]{2}(_p[0-9]+)?/pdfs/", ""),
-#         date_scraped = str_extract(pdf_filenames, "pdfs_2025_0[2-4]_[0-9]{2}"),
-#         successfully_scraped = unlist(pdf_success),
-#         old_path = unlist(pdf_paths)
-#     )

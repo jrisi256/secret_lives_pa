@@ -72,3 +72,11 @@ The workflow for scraping goes like this:
    3. After **download_PDFs.py** finishes running (e.g., it completes, it crashes, the server closes), run** **create_log_file.py** where the recently used log file will be the *old log file*.
    4. Iterate until all the PDFs are downloaded.
    5. Running the scripts on ROAR Collab, one can use the shell script provided (e.g., **download_pdfs_2025_02_04.sh**) ensuring to change the run time arguments as appropriate.
+
+## 7. Parsing the PDFs
+
+1. After downloading all the PDFs, one would run **check_and_reorganize_PDFs.R** which will reorganize the PDFs into a more coherent folder structure.
+2. Then, run **examine_missing_cases.R** to descriptively see which cases were redacted in between the scrape of the links and the downloading of the PDFs.
+   1. We downloaded the docket sheets and court summaries for criminal cases and landlord/tenant cases (total = 5,040,264). Because there are 2 PDFs to download for each case, we downloaded 10,080,528 PDFs.
+   2. Of these PDFs, 535,519 PDFs failed to download (roughly 5.3%).
+   3. This means we have 9,545,009 PDFs to parse.
