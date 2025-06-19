@@ -1,0 +1,345 @@
+case_nr = -1
+case_nr_idx = "case_" + str(case_nr)
+seq_nr = -1
+seq_nr_idx = "seq_" + str(seq_nr)
+sentence_nr = -1
+sentence_nr_idx = "sentence_" + str(sentence_nr)
+
+############# CURRENTLY WORKING ##########################
+def extract_closed_cases(line_index, pdf_lines):
+    still_on_closed_cases = True
+    while(still_on_closed_cases):
+        cur_line_closed = pdf_lines[line_index]
+
+        # Check if the current line is a new county.
+        if(cur_line_closed.strip() in counties):
+            county = cur_line.lower().strip()
+        # If we are not on a new county or new case status, the top three lines of every closed case follow a consistent pattern. It also signals a new case.
+        # 1st line: Docket Number, Proc. Status, DC Number, and OTN Number.
+        # 2nd line: Arrest date, disposition date, and disposition judge.
+        # 3rd line: Defense attorney
+        elif("Proc Status: " in cur_line_closed):
+            case_nr += 1
+            case_nr_idx = "case_" + str(case_nr)
+            cs_dict[case_status][case_nr_idx] = {}
+            cs_dict[case_status][case_nr_idx]["county"] = county
+            cs_dict[case_status][case_nr_idx]["docket_number"] = cur_line.split("Proc Status:")[0].strip()
+            cs_dict[case_status][case_nr_idx]["proc_status"] = cur_line.split("Proc Status:")[1].split("DC No:")[0].strip().lower()
+            cs_dict[case_status][case_nr_idx]["dc_nr"] = cur_line.split("Proc Status:")[1].split("DC No:")[1].split("OTN:")[0].strip().lower()
+            cs_dict[case_status][case_nr_idx]["otn_nr"] = cur_line.split("Proc Status:")[1].split("DC No:")[1].split("OTN:")[1].strip().lower()
+        elif("Arrest Dt: " in cur_line):
+            print(cur_line)
+            cs_dict[case_status][case_nr_idx]["arrest_date"] = cur_line.split("Arrest Dt:")[1].split("Disp Date:")[0].strip()
+            cs_dict[case_status][case_nr_idx]["disp_date"] = cur_line.split("Arrest Dt:")[1].split("Disp Date:")[1].split("Disp Judge:")[0].strip()
+            cs_dict[case_status][case_nr_idx]["disp_judge"] = cur_line.split("Arrest Dt:")[1].split("Disp Date:")[1].split("Disp Judge:")[1].strip()
+        elif("Def Atty:" in cur_line):
+            cs_dict[case_status][case_nr_idx]["def_attorney"] = cur_line.split("Def Atty:")[1].strip()
+        # When we encounter §, it marks the beginning of a new sequence. We can split on the space between entries to capture the relevant information.
+        elif("§" in cur_line):
+            seq_nr +=1
+            seq_nr_idx = "seq_" + str(seq_nr)
+            cs_dict[case_status][case_nr_idx][seq_nr_idx] = {}
+
+            # Split on conseuctive sequence of white space and remove empty entries.
+            seq_line = re.split("\s{2,}", cur_line)
+            seq_line = [element for element in seq_line if element]
+
+            cs_dict[case_status][case_nr_idx][seq_nr_idx]["seq_num"] = seq_line[0].strip()
+            cs_dict[case_status][case_nr_idx][seq_nr_idx]["statute"] = seq_line[1].strip()
+            cs_dict[case_status][case_nr_idx][seq_nr_idx]["grade"] = seq_line[2].strip()
+            cs_dict[case_status][case_nr_idx][seq_nr_idx]["description"] = seq_line[3].strip()
+            cs_dict[case_status][case_nr_idx][seq_nr_idx]["disposition"] = seq_line[4].strip()
+
+        lines_index += lines_index + 1
+############################ CURRENTLY WORKING #########################################################################
+
+def extract_inactive_active_cases():
+    print("hello")
+
+# Go line by line.
+while(current_line_index < len(lines)):
+    cur_line = lines[current_line_index]
+    
+    # Check if the current line is a new set of case (statuses).
+    if((cur_line.lower().strip() in "closed" or cur_line.lower().strip() in "inactive" or cur_line.lower().strip() in "active") and cur_line.lower().strip() not in "continued"):
+        case_status = cur_line.lower().strip()
+        cs_dict[case_status] = {}
+
+        if(case_status == "closed"):
+            extract_closed_cases(current_line_index, lines)
+
+        #############################################################################
+        # REFACTOR CODE TO DO THIS.
+        ##########################################################################
+        # Need to follow different logic depending on if the current set of cases are closed vs. active/inactive.
+        # if(case_status == "closed"):
+            # cs_dict[case_status] = extract_closed_cases()
+        #elif(case_status == "inactive" or case_status == "active"):
+            #cs_dict[case_status] = extract_inactive_active_cases()
+
+    # Check if the current line is a new county.
+    elif(cur_line.strip() in counties):
+        county = cur_line.lower().strip()
+    # If we are not on a new county or new case status, the top three lines of every closed case follow a consistent pattern. It also signals a new case.
+    # 1st line: Docket Number, Proc. Status, DC Number, and OTN Number.
+    # 2nd line: Arrest date, disposition date, and disposition judge.
+    # 3rd line: Defense attorney
+    elif("Proc Status: " in cur_line):
+        case_nr += 1
+        case_nr_idx = "case_" + str(case_nr)
+        cs_dict[case_status][case_nr_idx] = {}
+        cs_dict[case_status][case_nr_idx]["county"] = county
+        cs_dict[case_status][case_nr_idx]["docket_number"] = cur_line.split("Proc Status:")[0].strip()
+        cs_dict[case_status][case_nr_idx]["proc_status"] = cur_line.split("Proc Status:")[1].split("DC No:")[0].strip().lower()
+        cs_dict[case_status][case_nr_idx]["dc_nr"] = cur_line.split("Proc Status:")[1].split("DC No:")[1].split("OTN:")[0].strip().lower()
+        cs_dict[case_status][case_nr_idx]["otn_nr"] = cur_line.split("Proc Status:")[1].split("DC No:")[1].split("OTN:")[1].strip().lower()
+    elif("Arrest Dt: " in cur_line):
+        print(cur_line)
+        cs_dict[case_status][case_nr_idx]["arrest_date"] = cur_line.split("Arrest Dt:")[1].split("Disp Date:")[0].strip()
+        cs_dict[case_status][case_nr_idx]["disp_date"] = cur_line.split("Arrest Dt:")[1].split("Disp Date:")[1].split("Disp Judge:")[0].strip()
+        cs_dict[case_status][case_nr_idx]["disp_judge"] = cur_line.split("Arrest Dt:")[1].split("Disp Date:")[1].split("Disp Judge:")[1].strip()
+    elif("Def Atty:" in cur_line):
+        cs_dict[case_status][case_nr_idx]["def_attorney"] = cur_line.split("Def Atty:")[1].strip()
+    # When we encounter §, it marks the beginning of a new sequence. We can split on the space between entries to capture the relevant information.
+    elif("§" in cur_line):
+        seq_nr +=1
+        seq_nr_idx = "seq_" + str(seq_nr)
+        cs_dict[case_status][case_nr_idx][seq_nr_idx] = {}
+
+        # Split on conseuctive sequence of white space and remove empty entries.
+        seq_line = re.split("\s{2,}", cur_line)
+        seq_line = [element for element in seq_line if element]
+
+        cs_dict[case_status][case_nr_idx][seq_nr_idx]["seq_num"] = seq_line[0].strip()
+        cs_dict[case_status][case_nr_idx][seq_nr_idx]["statute"] = seq_line[1].strip()
+        cs_dict[case_status][case_nr_idx][seq_nr_idx]["grade"] = seq_line[2].strip()
+        cs_dict[case_status][case_nr_idx][seq_nr_idx]["description"] = seq_line[3].strip()
+        cs_dict[case_status][case_nr_idx][seq_nr_idx]["disposition"] = seq_line[4].strip()
+
+    # Advance to the next line.
+    current_line_index += 1
+    print(cs_dict)
+
+input_dir = "../output/pdf_download_list/pdfs/"
+files = os.listdir(input_dir)
+court_summaries_commonpleas = [f for f in files if 'CS_CP' in f]
+court_summaries_magisterial = [f for f in files if 'CS_MJ' in f]
+
+import re
+
+def split_string_by_multiple_spaces(input_string):
+  """
+  Splits a string by two or more consecutive whitespace characters.
+
+  Args:
+    input_string: The string to split.
+
+  Returns:
+    A list of strings after splitting.
+  """
+  return re.split(r'\s{2,}', input_string)
+
+# Example usage
+string1 = "This  is   a    test string."
+string2 = "One  two   three four"
+string3 = "Single spaces. No split."
+string4 = "Start      middle end"
+
+result1 = split_string_by_multiple_spaces(string1)
+result2 = split_string_by_multiple_spaces(string2)
+result3 = split_string_by_multiple_spaces(string3)
+result4 = split_string_by_multiple_spaces(string4)
+
+print(f"'{string1}' split: {result1}")
+print(f"'{string2}' split: {result2}")
+print(f"'{string3}' split: {result3}")
+print(f"'{string4}' split: {result4}")
+
+test = "name"
+test_dict = {}
+test_dict[test] = "monkey"
+
+
+dict = {}
+dict["closed"] = {}
+dict["closed"]["case_0"] = {}
+dict["closed"]["case_0"]["county"] = "Philadelphia"
+dict["closed"]["case_0"]["docket_nr"] = "CP-51-CR-0013145-2010"
+dict["closed"]["case_0"]["proc_status"] = "completed"
+dict["closed"]["case_0"]["dc_nr"] = "10240"
+dict["closed"]["case_0"]["OTN"] = "N 700005-5"
+dict["closed"]["case_0"]["arrest_date"] = "08/31/2010"
+dict["closed"]["case_0"]["disp_date"] = "03/23/2011"
+dict["closed"]["case_0"]["disp_judge"] = "Paula A. Patrick"
+dict["closed"]["case_0"]["def_attorney"] = "Edward C. Jr. Meehan"
+dict["closed"]["case_0"]["seq_0"] = {}
+dict["closed"]["case_0"]["seq_0"]["seq_num"] = "1"
+dict["closed"]["case_0"]["seq_0"]["statute"] = "18&6106&&A1"
+dict["closed"]["case_0"]["seq_0"]["grade"] = "F3"
+dict["closed"]["case_0"]["seq_0"]["description"] = "firearms not to be carried w/o license"
+dict["closed"]["case_0"]["seq_0"]["disposition"] = "guilty"
+dict["closed"]["case_0"]["seq_0"]["sentence_0"] = {}
+dict["closed"]["case_0"]["seq_0"]["sentence_0"]["sentence_date"] = "05/18/2011"
+dict["closed"]["case_0"]["seq_0"]["sentence_0"]["sentence_type"] = "confinement"
+dict["closed"]["case_0"]["seq_0"]["sentence_0"]["program_period"] = "11 1/2 - 23 months"
+dict["closed"]["case_0"]["seq_0"]["sentence_0"]["sentence_length"] = "min: 11 months 15 days max: 23 months"
+dict["closed"]["case_0"]["seq_0"]["sentence_1"] = {}
+dict["closed"]["case_0"]["seq_0"]["sentence_1"]["sentence_date"] = "05/18/2011"
+dict["closed"]["case_0"]["seq_0"]["sentence_1"]["sentence_type"] = "probation"
+dict["closed"]["case_0"]["seq_0"]["sentence_1"]["program_period"] = "2 years"
+dict["closed"]["case_0"]["seq_0"]["sentence_1"]["sentence_length"] = "max 2 years"
+dict["closed"]["case_0"]["seq_1"] = {}
+dict["closed"]["case_0"]["seq_1"]["seq_num"] = "2"
+dict["closed"]["case_0"]["seq_1"]["statute"] = "18&6108"
+dict["closed"]["case_0"]["seq_1"]["grade"] = "M1"
+dict["closed"]["case_0"]["seq_1"]["description"] = "carry firearms in public"
+dict["closed"]["case_0"]["seq_1"]["disposition"] = "guilty"
+
+dict
+
+current_line_index = poi_end_index
+cs_dict = {}
+
+# Loop through the rest of the lines and capture information about an individual's criminal history.
+while(current_line_index < len(lines)):
+    cur_line = lines[current_line_index].lower().strip()
+    new_line_index = ""
+
+    # Check if the current line is a new set of case (statuses).
+    if((cur_line in "closed" or cur_line in "inactive" or cur_line in "active") and cur_line not in "continued"):
+        case_status = cur_line
+        cs_dict[case_status] = {}
+
+        # Increment the index by 1 because we want to start parsing the line following the case status line.
+        if(case_status == "closed"):
+            result_tuple = extract_closed_cases(current_line_index + 1, lines)
+        elif(case_status == "inactive" or case_status == "active"):
+            result_tuple = extract_inactive_active_cases(current_line_index + 1, lines)
+
+        cs_dict[case_status], new_line_index = result_tuple
+
+    current_line_index = new_line_index
+
+    def give_indices(str_to_find,case_info):
+    occurences = [x for x in case_info if str_to_find in x]
+    index_occurences = [case_info.index(x) for x in occurences]
+    return index_occurences
+
+pages = pdf.pages
+
+"""
+    ∧＿∧
+    (｡･ω･｡)つ━☆・*。
+    ⊂/    /       ・゜
+    しーＪ         °。+ * 。
+
+Parse through each PDF, if any error comes up write it a text file.
+"""
+try:
+    info_dict = {}
+    for i,page in enumerate(pages):
+        # print(f"Parsing Page {i+1}")
+        text = page.extract_text(keep_blank_chars=True,layout=True).split("\n")
+
+        # first page with POI
+        closed_indices = [i for i,x in enumerate(text) if "closed" in x.lower() or "inactive" in x.lower()]
+
+        case_info = text[closed_indices[0]+1:]
+        closed_endings = [0] + give_indices('Proc',case_info)
+        printed_endings = give_indices('Printed',case_info)
+
+        start_index = 0
+        if len(closed_endings) < 2:
+            closed_endings.extend(give_indices('Recent entries',case_info))
+        end_index = closed_endings[1]
+
+        case_numbers = []
+        case_information = []
+        while len(closed_endings) > 0:
+        # processing cases 
+            
+            start_index = closed_endings[0]
+            if len(closed_endings) > 1:
+                end_index = closed_endings[1]-1
+            else:
+                end_index = printed_endings[0]
+
+            case_sliced = case_info[start_index:end_index]
+            print(case_sliced)
+
+            ## ripping out case number
+            # '        MJ-26303-CR-0000170-2003 Processing Status: Completed OTN: H 647213-0       ',
+            processing_status_str = 'Processing Status:'
+            proc_status_str = 'Proc Status:'
+
+            if any(filter(lambda s: processing_status_str in s, case_sliced)):
+                case_number_str = [x for x in case_sliced if processing_status_str in x]
+                case_number_index = give_indices(processing_status_str,case_number_str)[0]+1
+                case_number = case_number_str[0].split(processing_status_str)[0].strip()
+                
+            elif any(filter(lambda s: proc_status_str in s, case_sliced)):
+                case_number_str = [x for x in case_sliced if proc_status_str in x]
+                case_number_index = give_indices(proc_status_str,case_number_str)[0]+1
+                case_number = case_number_str[0].split(proc_status_str)[0].strip()
+            else:
+                print("No Processing Found")
+                break
+            
+
+            # continue processing the rest of the case info
+            case_sliced = case_sliced[case_number_index:]
+            
+
+            #  '        Statute          Grade Description             Disposition          Counts  ',
+            column_names_cases = give_indices('Statute',case_sliced)[0]+1
+
+            # Hacky Way to get Description Column
+            # 1. Determine at what index Description occurs
+            description_index = case_sliced[column_names_cases-1].index("Description")
+            
+
+            case_info_dict = {}
+            sliced_case_v0 = case_sliced[:column_names_cases-1]
+
+            for x in sliced_case_v0:
+                pre_split_v0 = x.split("  ")
+                pre_split_ws_removed_v0 = [s for s in pre_split_v0 if s]
+                for val in pre_split_ws_removed_v0:
+                    vals = val.split(":")
+                    if len(vals) > 1:
+                        case_info_dict[vals[0].strip()] = vals[1]
+
+            sliced_case_v1 = case_sliced[column_names_cases:]
+
+            stat = []
+            gd = []
+            counts = []
+            description = []
+            disposition = []
+            for x in sliced_case_v1:
+                pre_split = x.split("  ")
+                pre_split_ws_removed = [s for s in pre_split if s]
+                if len(pre_split_ws_removed) > 3:
+                    stat.append(pre_split_ws_removed[0].strip())
+                    gd.append(pre_split_ws_removed[1].strip())
+                    # Descriptions generally follow the same place as the Column
+                    description.append(pre_split_ws_removed[2].strip())
+                    disposition.append(pre_split_ws_removed[3].strip())
+                    counts.append(pre_split_ws_removed[-1].strip())
+                    
+            case_info_dict['Statute'] = stat
+            case_info_dict['Grade Description'] = gd
+            case_info_dict['Counts'] = counts
+            case_info_dict['Description'] = description
+            case_info_dict['Disposition'] = disposition
+            case_info_dict['Status'] = text[closed_indices[0]].strip()
+            case_info_dict['case_number'] = case_number
+
+            # info_dict[case_number] = case_info_dict
+            case_numbers.append(case_number)
+            case_information.append(case_info_dict)
+
+            closed_endings.pop(0)
+
+except Exception as e:
+    print(e)
