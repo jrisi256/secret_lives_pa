@@ -75,8 +75,10 @@ The workflow for scraping goes like this:
 
 ## 7. Parsing the PDFs
 
-1. After downloading all the PDFs, one would run **check_and_reorganize_PDFs.R** which will reorganize the PDFs into a more coherent folder structure.
-2. Then, run **examine_missing_cases.R** to descriptively see which cases were redacted in between the scrape of the links and the downloading of the PDFs.
+1. After downloading all the PDFs, one would run **1_check_and_reorganize_PDFs.R** which will reorganize the PDFs into a more coherent folder structure.
+2. Then, run **2_examine_missing_cases.R** to descriptively see which cases were redacted in between the scrape of the links and the downloading of the PDFs.
    1. We downloaded the docket sheets and court summaries for criminal cases and landlord/tenant cases (total = 5,040,264). Because there are 2 PDFs to download for each case, we downloaded 10,080,528 PDFs.
    2. Of these PDFs, 535,519 PDFs failed to download (roughly 5.3%).
    3. This means we have 9,545,009 PDFs to parse.
+3. We then run **3_create_pdf_parse_list_and_sample.R** to create the data table for all of our PDFs and also to create our sample of PDFs for the undergraduates to verify.
+   1. We decided to sample only criminal cases. We decided to sample 9 cases from the court of common pleas and 9 cases from the magisterial courts for 5 years (2005/2006, 2010, 2014, 2019, 2023) for 6 counties (Allegheny, Blair, Centre, Dauphin, Montgomery, and Erie). This creates 540 cases which yields 1,080 PDFs (1 docket sheet and 1 court summary for each case). Assuming a human can parse 1 PDF in 10 minutes, and you work 15 hours each week for 6 weeks and you have 2 people, this would also yield 1,080 PDFs parsed. Some categories do not have the full 9 cases, though. So in total we have 1,066 PDFs to work with.
