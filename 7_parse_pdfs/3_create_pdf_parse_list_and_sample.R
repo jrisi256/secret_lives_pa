@@ -10,7 +10,8 @@ library(stringr)
 # Create list of PDF files.
 ################################################################################
 pdf_dir <- file.path("/media", "joe", "T7 Shield", "new_pdf_struct")
-out_dir <- here("output", "pdf_parse_list")
+out_dir <- here("output", "pdf_sample")
+chunk_dir <- here(out_dir, "pdf_chunk_lists")
 pdfs <- list.files(path = pdf_dir, recursive = T, full.names = T)
 
 ################################################################################
@@ -62,7 +63,8 @@ sample_pdf_df <-
     group_by(county, year, court_type) %>%
     slice_sample(n = 9) %>%
     ungroup() %>%
-    left_join(select(pdf_df, pdf_type, file_name, path, id), by = "id")
+    left_join(select(pdf_df, pdf_type, file_name, path, id), by = "id") |>
+    mutate(successfully_parsed = F)
 
 write_csv(sample_pdf_df, file.path(out_dir, "sample_pdf_table.csv"))
 
@@ -75,4 +77,33 @@ pwalk(
     function(orig_path, file_name) {
         file.copy(orig_path, here("output", "pdf_sample", file_name))
     }
+)
+
+################################################################################
+# Chunk up the sample for parsing.
+################################################################################
+args <-
+    expand_grid(
+        county = c("Allegheny", "Blair", "Centre", "Dauphin", "Montgomery", "Erie"),
+        court_type = c("CP", "MJ"),
+        pdf_type = c("cs", "ds")
+    )
+
+if(!(dir.exists(here("output", "pdf_sample", "pdf_chunk_lists")))) {
+    dir.create(here("output", "pdf_sample"))
+}
+
+pwalk(
+    list(args$county, args$court_type, args$pdf_type),
+    function(county_arg, court_type_arg, pdf_type_arg, df, dir) {
+        df <-
+            df |>
+            filter(county == county_arg, court_type == court_type_arg, pdf_type == pdf_type_arg) |>
+            select(file_name, succesfully_parsed) |>
+            write_csv(
+                file.path(dir, paste0(county_arg, "_", court_type_arg, "_", pdf_type_arg, ".csv"))
+            )
+    },
+    df = sample_pdf_table,
+    dir = chunk_dir
 )

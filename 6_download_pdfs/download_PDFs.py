@@ -15,7 +15,7 @@ csv_writer_lock = threading.Lock()
 csv_path = "/home/joe/Documents/secret_lives_pa/output/pdf_download_list/"
 pdf_path = "/home/joe/Documents/secret_lives_pa/output/pdf_download_list/pdfs/"
 
-# Intialize names for files.
+# Initialize names for files.
 arguments = sys.argv
 pdf_log_file = arguments[1]
 download_links_file = "pdf_download_links.csv"
