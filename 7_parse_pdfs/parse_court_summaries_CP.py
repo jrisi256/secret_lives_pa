@@ -72,7 +72,7 @@ def extract_poi(lines_arg):
     poi_dict["alias"] = remainder_alias
 
     return poi_dict, poi_end_index
-def extract_sqncs_and_sntncs(s_idx, s_lines, s_file):
+def extract_sqncs_and_sntncs(s_idx, s_lines, cur_docket_nr):
     # Initialize starting values.
     loop_through_sqncs_and_sntncs = True
     seq_nr = -1
@@ -89,9 +89,23 @@ def extract_sqncs_and_sntncs(s_idx, s_lines, s_file):
         else:
             break
 
-        # If the current line is a new set of case statuses, or a new county, function is completed.
-        if((("closed" == cur_s_line or "inactive" == cur_s_line or "active" == cur_s_line or "adjudicated" == cur_s_line or cur_s_line in counties or "proc status: " in cur_s_line) and "continued" not in cur_s_line)):
+        # If the current line is a new set of case statuses or a new county, the function is completed.
+        if((("closed" == cur_s_line or "inactive" == cur_s_line or "active" == cur_s_line or "adjudicated" == cur_s_line or cur_s_line in counties) and "continued" not in cur_s_line)):
             break
+        elif("proc status: " in cur_s_line):
+            # If the previous line has continued, we need to investigate.
+            if("continued" in s_lines[s_idx - 1].lower().strip()):
+                # Check and see if the current docket # equals the docket # of our current case. If so, we can skip this line since we already collected this info.
+                cur_line_docket_number = cur_s_line.split("proc status:")[0].strip()
+                if(cur_line_docket_number == cur_docket_nr):
+                    s_idx += 1
+                    continue
+                # If the current docket # does not equal the docket # of out current case, it is a new case whose data we need to collect. Break out of this function.
+                else:
+                    break
+            # If we have proc. status in the current line, and we do not have continued on the previous line, this is a new case. Exit the function.
+            else:
+                break
         # When we encounter §, it marks the beginning of a new sequence. We can split on the space between entries to capture the info.
         elif("§" in cur_s_line):
             # Reset the sentence counter because we are on a new sequence of charges.
@@ -125,7 +139,7 @@ def extract_sqncs_and_sntncs(s_idx, s_lines, s_file):
         s_idx += 1
 
     return seq_dict, s_idx
-def extract_closed_cases(c_idx, c_lines, c_file):
+def extract_closed_cases(c_idx, c_lines):
     # Initialize starting values.
     loop_through_closed_cases = True
     closed_dict = {}
@@ -185,7 +199,7 @@ def extract_closed_cases(c_idx, c_lines, c_file):
             closed_dict[case_nr_idx]["def_attorney"] = cur_c_line.split("def atty:")[1].strip()
         # When we encounter §, it marks the beginning of a new sequence.
         elif("§" in cur_c_line):
-            result_tuple = extract_sqncs_and_sntncs(c_idx, c_lines, c_file)
+            result_tuple = extract_sqncs_and_sntncs(c_idx, c_lines, closed_dict[case_nr_idx]["docket_number"])
             sequence_dict, line_increment_c = result_tuple
             closed_dict[case_nr_idx].update(sequence_dict)
         # If the line does not contain any of the above characters, it's a junk line, and we can skip it.
@@ -195,7 +209,7 @@ def extract_closed_cases(c_idx, c_lines, c_file):
         c_idx = line_increment_c
 
     return closed_dict, c_idx
-def extract_inactive_active_cases(ia_idx, ia_lines, ia_file):
+def extract_inactive_active_cases(ia_idx, ia_lines):
     # Initialize starting values.
     loop_through_ia_cases = True
     ia_dict = {}
@@ -267,7 +281,7 @@ def extract_inactive_active_cases(ia_idx, ia_lines, ia_file):
             ia_dict[case_nr_idx]["def_attorney"] = cur_ia_line.split("def atty:")[1].strip()
         # When we encounter §, it marks the beginning of a new sequence.
         elif("§" in cur_ia_line):
-            result_tuple = extract_sqncs_and_sntncs(ia_idx, ia_lines, ia_file)
+            result_tuple = extract_sqncs_and_sntncs(ia_idx, ia_lines, ia_dict[case_nr_idx]["docket_number"])
             sequence_dict, line_increment_ia = result_tuple
             ia_dict[case_nr_idx].update(sequence_dict)
         elif("disp date:" in cur_ia_line):
@@ -344,7 +358,7 @@ for row in pdf_parse_table_df.itertuples():
             # Increment the index by 1 because we want to start parsing the line following the case status line.
             if(case_status == "closed"):
                 try:
-                    result_tuple = extract_closed_cases(current_line_index + 1, lines, row.file_name)
+                    result_tuple = extract_closed_cases(current_line_index + 1, lines)
                     logging.info("Successfully extracted closed cases.")
                 except Exception as e:
                     logging.error(f"Error in extracting closed cases. The error is {e}")
@@ -355,7 +369,7 @@ for row in pdf_parse_table_df.itertuples():
                     break
             elif(case_status == "inactive" or case_status == "active" or case_status == "adjudicated"):
                 try:
-                    result_tuple = extract_inactive_active_cases(current_line_index + 1, lines, row.file_name)
+                    result_tuple = extract_inactive_active_cases(current_line_index + 1, lines)
                     logging.info("Successfully extracted inactive/active/adjudicated cases.")
                 except Exception as e:
                     logging.error(f"Error in extracting inactive/active/adjudicated cases. The error is {e}")
