@@ -45,242 +45,226 @@ def extract_poi(lines_arg):
     poi_dict = {}
 
     # Beginning part of every court summary in court of common pleas has a block of text with person information.
-    poi_start_index = [i for i, x in enumerate(lines_arg) if "DOB:" in x][0]
-    poi_end_index = [i for i,x in enumerate(lines_arg) if "closed" in x.lower() or "inactive" in x.lower() or "active" in x.lower() or "adjudicated" in x.lower()][0]
-    poi = lines_arg[poi_start_index:poi_end_index]
+    # Organizations do not have date of birth so we need another way to identify the beginning of the POI information.
+    try:
+        poi_start_index = [i for i, x in enumerate(lines) if "DOB:" in x][0]
+    except Exception as e:
+        # Search through the lines until we come to the first line which does not contain the key phrases and is not an empty line.
+        for i, line in enumerate(lines):
+            if(re.search("magisterial\s+district\s+court", line.lower()) is None and re.search("public\s+court\s+summary", line.lower()) is None and line.strip() != ""):
+                poi_start_index = i
+                break
 
-    # Name, DOB, and Sex appear on the first line.
-    poi_dict["name"] = poi[0].split("DOB:")[0].strip()
-    poi_dict["dob"] = poi[0].split("DOB:")[1].split("Sex:")[0].strip()
-    poi_dict["sex"] = poi[0].split("DOB:")[1].split("Sex:")[1].strip()
+    poi_end_index = [i for i,x in enumerate(lines) if "court:" in x.lower()][0]
+    poi = lines[poi_start_index:poi_end_index]
 
-    # Location and Eye Color appear on the second line.
-    poi_dict["home_location"] = poi[1].split("Eyes:")[0].strip().lower()
-    poi_dict["eyes"] = poi[1].split("Eyes:")[1].strip()
+    # Name, DOB, and Sex appear on the first line. Very rarely they do not (such as when it's an organization who is the defendant).
+    if("DOB:" in poi[0] and "Sex:" in poi[0]):
+        poi_dict["name"] = poi[0].split("DOB:")[0].strip()
+        poi_dict["dob"] = poi[0].split("DOB:")[1].split("Sex:")[0].strip()
+        poi_dict["sex"] = poi[0].split("DOB:")[1].split("Sex:")[1].strip()
+    # If DOB and sex do not appear, the name should still appear.
+    else:
+        poi_dict["name"] = poi[0].strip()
 
-    # Alias and hair color are on the third line, but alias is blank on this line.
-    poi_dict["hair"] = poi[2].split("Hair:")[1].strip()
+    # Location and Eye Color appear on the second line unless it's an organization (like above).
+    if("Eyes:" in poi[1]):
+        poi_dict["home_location"] = poi[1].split("Eyes:")[0].strip().lower()
+        poi_dict["eyes"] = poi[1].split("Eyes:")[1].strip()
+    # If eye color does not appear, the home location still should.
+    else:
+        poi_dict["home_location"] = poi[1].strip()
 
-    # The first alias and race are on the fourth line.
-    alias = poi[3].split("Race:")[0].strip()
-    poi_dict["race"] = poi[3].split("Race:")[1].strip()                          
+    # For organizations, the personal information will only be 3 lines.
+    if(len(poi) > 3):
+        # Hair color is on the third line.
+        poi_dict["hair"] = poi[2].split("Hair:")[1].strip()
 
-    # The rest of the aliases are on subsequent lines.
-    remainder_alias = poi[4:len(poi)]
-    remainder_alias = [element.strip() for element in remainder_alias]
-    remainder_alias.append(alias)
-    poi_dict["alias"] = remainder_alias
+        # Race is on the fourth line.
+        poi_dict["race"] = poi[3].split("Race:")[1].strip()
+
+        # On the fifth line, if the person has an alias, their aliases will be listed here.
+        # If they do not have any aliases, the PDF immediately starts the criminal history.
+        poi_dict["alias"] = ""
+        if(len(poi) > 4):
+            poi_dict["alias"] = poi[4].split("Aliases:")[1].strip()
 
     return poi_dict, poi_end_index
-def extract_sqncs_and_sntncs(s_idx, s_lines, s_file):
-    # Initialize starting values.
-    loop_through_sqncs_and_sntncs = True
-    seq_nr = -1
-    seq_nr_idx = "seq_" + str(seq_nr)
-    sentence_nr = -1
-    sentence_nr_idx = "sentence_" + str(sentence_nr)
-    seq_dict = {}
+def extract_punishment(p_idx, p_lines):
+    # Initialize starting values
+    loop_through_punishment = True
+    punishment_nr = -1
+    punishment_nr_idx = "punishment_nr_" + str(punishment_nr)
+    punishment_dict = {}
 
-    while(loop_through_sqncs_and_sntncs):
-
+    while(loop_through_punishment):
         # If the current line is the last line, exit out of the function.
-        if(s_idx < len(s_lines)):
-            cur_s_line = s_lines[s_idx].lower().strip()
+        if(p_idx < len(p_lines)):
+            cur_p_line = p_lines[p_idx].lower()
         else:
             break
 
-        # If the current line is a new set of case statuses, or a new county, function is completed.
-        if((("closed" == cur_s_line or "inactive" == cur_s_line or "active" == cur_s_line or "adjudicated" == cur_s_line or cur_s_line in counties or "proc status: " in cur_s_line) and "continued" not in cur_s_line)):
+        # If the current line has processing status, court, county, statewide, or a case status, then it is a new case.
+        # This means we've reached the end of punishments.
+        if("processing status:" in cur_p_line or "court:" in cur_p_line or "county:" in cur_p_line or "statewide" == cur_p_line or cur_p_line in counties or cur_p_line in ["active", "inactive", "closed"]):
             break
-        # When we encounter §, it marks the beginning of a new sequence. We can split on the space between entries to capture the info.
-        elif("§" in cur_s_line):
-            # Reset the sentence counter because we are on a new sequence of charges.
-            sentence_nr = -1
-            sentence_nr_idx = "sentence_" + str(sentence_nr)
-            
-            seq_nr += 1
-            seq_nr_idx = "seq_" + str(seq_nr)
-            seq_dict[seq_nr_idx] = {}
-            
-            # You can think of the PDF as a fixed-width data table. Hopefully, each of these values is always contained within these lengths.
-            seq_dict[seq_nr_idx]["seq_num"] = cur_s_line[:11].strip()
-            seq_dict[seq_nr_idx]["statute"] = cur_s_line[11:48].strip()
-            seq_dict[seq_nr_idx]["grade"] = cur_s_line[48:54].strip()
-            seq_dict[seq_nr_idx]["description"] = cur_s_line[54:95].strip()
-            seq_dict[seq_nr_idx]["disposition"] = cur_s_line[95:].strip()
+        # If the line is only whitespace, or if it has reached the bottom-of-the-page text, ignore it.
+        elif(cur_p_line.strip() == "" or "printed:" in cur_p_line or re.search("recent\s+entries\s+made\s+in\s+the", cur_p_line) or re.search("system\s+of\s+the\s+commonwealth\s+of", cur_p_line) or re.search("should\s+not\s+be\s+used\s+in\s+place", cur_p_line) or re.search("employers\s+who\s+do\s+not\s+comply", cur_p_line) or re.search("may\s+be\s+subject\s+to\s+civil", cur_p_line) or re.search("please\s+note\s+that\s+if\s+the", cur_p_line) or re.search("court\s+case\s+management\s+system\s+for\s+this\s+offense", cur_p_line) or re.search("is\s+charged\s+in\s+order\s+to", cur_p_line)):
+            p_idx += 1
+            continue
+        # If we have not hit a new case, then the line is a punishment.
+        else:
+            program_type = cur_p_line[:55].strip()
+            sentence_date = cur_p_line[55:88].strip()
+            sentence_length = cur_p_line[88:141].strip()
+            program_period = cur_p_line[141:].strip()
 
-        # When we encounter "min:" or "max:", we begin capturing the sentenced punishments.
-        elif("min:" in cur_s_line or "max:" in cur_s_line or re.search(r"\d{2}/\d{2}/\d{4}", cur_s_line)):
-            sentence_nr += 1
-            sentence_nr_idx = "sentence_" + str(sentence_nr)
-            seq_dict[seq_nr_idx][sentence_nr_idx] = {}
+            # This indicates the punishment line is an overflow line that is still describing the previous punishment's sentence length.
+            if(program_type == "" and sentence_date == "" and program_period == "" and punishment_nr_idx != -1):
+                punishment_dict[punishment_nr_idx]["sentence_length"] = punishment_dict[punishment_nr_idx]["sentence_length"] + " " + sentence_length
+            # This indicates the punishment line is an overflow line that is still describing the previous punishment's program type.
+            elif(sentence_length == "" and sentence_date == "" and program_period == "" and punishment_nr_idx != -1):
+                punishment_dict[punishment_nr_idx]["program_type"] = punishment_dict[punishment_nr_idx]["program_type"] + " " + program_type
+            else:
+                punishment_nr += 1
+                punishment_nr_idx = "punishment_nr_" + str(punishment_nr)
+                punishment_dict[punishment_nr_idx] = {}
 
-            # You can think of the PDF as a fixed-width data table. Hopefully, each of these values is always contained within these lengths.
-            seq_dict[seq_nr_idx][sentence_nr_idx]["sentence_date"] = cur_s_line[:17].strip()
-            seq_dict[seq_nr_idx][sentence_nr_idx]["sentence_type"] = cur_s_line[17:43].strip()
-            seq_dict[seq_nr_idx][sentence_nr_idx]["program_period"] = cur_s_line[43:74].strip()
-            seq_dict[seq_nr_idx][sentence_nr_idx]["sentence_length"] = cur_s_line[74:].strip()
-            
+                punishment_dict[punishment_nr_idx]["program_type"] = program_type
+                punishment_dict[punishment_nr_idx]["sentence_date"] = sentence_date
+                punishment_dict[punishment_nr_idx]["sentence_length"] = sentence_length
+                punishment_dict[punishment_nr_idx]["program_period"] = program_period
+
         # Move on to the next line.
-        s_idx += 1
+        p_idx += 1
 
-    return seq_dict, s_idx
-def extract_closed_cases(c_idx, c_lines, c_file):
-    # Initialize starting values.
-    loop_through_closed_cases = True
-    closed_dict = {}
+    return punishment_dict, p_idx
+def extract_cases(c_idx, c_lines):
+    # Set initial values.
     case_nr = -1
-    case_nr_idx = "case_" + str(case_nr)
+    case_nr_idx = "case_nr_" + str(case_nr)
+    charge_nr = -1
+    charge_nr_idx = "charge_nr_" + str(charge_nr)
+    punishment_nr = -1
+    punishment_nr_idx = "punishment_nr_" + str(punishment_nr)
+
+    loop_through_cases = True
+    statewide_flag = False
+    current_court_county = ""
+    current_case_status = ""
+
     line_increment_c = c_idx
-    
-    while(loop_through_closed_cases):
-        
-        # If we are on the last line of the PDF, we have finished all closed cases.
+    case_dict = {}
+
+    while(loop_through_cases):
+        # If the current line is the last line, exit out of the function.
         if(c_idx < len(c_lines)):
             cur_c_line = c_lines[c_idx].lower().strip()
         else:
-            loop_through_closed_cases = False
-            continue
+            break
+        
+        # Set the court/county for this set of cases.
+        if("court:" in cur_c_line or "county:" in cur_c_line or cur_c_line in counties):
+            # Clean up the line.
+            if("court:" in cur_c_line):
+                new_court_county = cur_c_line.split("court:")[1].strip()
+            elif("county:" in cur_c_line):
+                new_court_county = cur_c_line.split("county:")[1].strip()
+            elif(cur_c_line in counties):
+                new_court_county = cur_c_line
 
-        # If the current line has a case status, we have finished all closed cases.
-        if(("inactive" == cur_c_line or "active" == cur_c_line or "adjudicated" == cur_c_line) and "continued" not in cur_c_line):
-            loop_through_closed_cases = False
-        # Check if the current line is a new county.
-        elif(cur_c_line in counties):
-            line_increment_c += 1
-            county = cur_c_line
-        # If we are not on a new county or new case status, then we are on a new case.
-        # 1st line: Docket Number, Proc. Status, DC Number, and OTN Number.
-        # 2nd line: Arrest date, disposition date, and disposition judge.
-        # 3rd line: Defense attorney
-        elif("proc status: " in cur_c_line):
-            # If the previous line has continued, we need to investigate.
-            if("continued" in c_lines[c_idx -1].lower().strip()):
-                # Check and see if the current docket # equals the docket # in our dictionary. If so, we can skip this line since we already collected this info.
-                # If the current docket # does not equal the docket # in our dictionary, it is new case whose data we need to collect.
-                # Also, if this is the first docket # for this set of case statues, then this is also obviously a new case.
-                cur_line_docket_number = cur_c_line.split("proc status:")[0].strip()
-                if(case_nr != -1 and cur_line_docket_number == closed_dict[case_nr_idx]["docket_number"]):
-                    line_increment_c += 1
-                    c_idx = line_increment_c
-                    continue
+            # Check if the new county/court is different from our current county/court. If it is, update the current court/county.
+            if(new_court_county != current_court_county):
+                current_court_county = new_court_county
 
+        # Set the case status for this set of cases and check that it is different from the previous case status.
+        if(("closed" == cur_c_line or "inactive" == cur_c_line or "active" == cur_c_line) and cur_c_line != current_case_status):
+            current_case_status = cur_c_line
+
+        # I believe statewide cases are always at the end of the PDF so once this is turned on, it stays on.
+        # I.e., all subsequent cases will always be statewide.
+        if("statewide" == cur_c_line):
+            statewide_flag = True
+
+        # When we encounter processing status/otn, we are on a new case.
+        # 1st line is Docket number, processing status, and OTN.
+        # 2nd line is arrest date, processing location, and disposition event date.
+        # 3rd line is last action and last action date.
+        # 4th line is next action and next action date.
+        # 5th line (optional) is bail type, bail amount, and bail status.
+        # After that, each subsequent line is a prior charge.
+        if("processing status:" in cur_c_line or "otn:" in cur_c_line or "otn/lotn:" in cur_c_line):
             line_increment_c += 1
+
             case_nr += 1
             case_nr_idx = "case_" + str(case_nr)
-            closed_dict[case_nr_idx] = {}
+            case_dict[case_nr_idx] = {}
+
+            charge_nr = -1
+            charge_nr_idx = "charge_nr_" + str(charge_nr)
+
+            case_dict[case_nr_idx]["court_or_county"] = current_court_county
+            case_dict[case_nr_idx]["case_status"] = current_case_status
+            case_dict[case_nr_idx]["statewide"] = statewide_flag
             
-            closed_dict[case_nr_idx]["county"] = county
-            closed_dict[case_nr_idx]["docket_number"] = cur_c_line.split("proc status:")[0].strip()
-            closed_dict[case_nr_idx]["proc_status"] = cur_c_line.split("proc status:")[1].split("dc no:")[0].strip().lower()
-            closed_dict[case_nr_idx]["dc_nr"] = cur_c_line.split("proc status:")[1].split("dc no:")[1].split("otn:")[0].strip().lower()
-            closed_dict[case_nr_idx]["otn_nr"] = cur_c_line.split("proc status:")[1].split("dc no:")[1].split("otn:")[1].strip().lower()
-        elif("arrest dt: " in cur_c_line):
+            # Sometimes a case may not have a processing status.
+            if("processing status:" not in cur_c_line):
+                if("otn/lotn:" in cur_c_line):
+                    case_dict[case_nr_idx]["docket_number"] = cur_c_line.split("otn/lotn:")[0].strip().lower()
+                    case_dict[case_nr_idx]["otn_lotn"] = cur_c_line.split("otn/lotn:")[1].strip().lower()
+                elif("otn:" in cur_c_line):
+                    case_dict[case_nr_idx]["docket_number"] = cur_c_line.split("otn:")[0].strip().lower()
+                    case_dict[case_nr_idx]["otn"] = cur_c_line.split("otn:")[1].strip().lower()
+            else:
+                if("otn/lotn:" in cur_c_line):
+                    case_dict[case_nr_idx]["docket_number"] = cur_c_line.split("processing status:")[0].strip()
+                    case_dict[case_nr_idx]["proc_status"] = cur_c_line.split("processing status:")[1].split("otn/lotn:")[0].strip().lower()
+                    case_dict[case_nr_idx]["otn_lotn"] = cur_c_line.split("processing status:")[1].split("otn/lotn:")[1].strip().lower()
+                elif("otn:" in cur_c_line):
+                    case_dict[case_nr_idx]["docket_number"] = cur_c_line.split("processing status:")[0].strip()
+                    case_dict[case_nr_idx]["proc_status"] = cur_c_line.split("processing status:")[1].split("otn:")[0].strip().lower()
+                    case_dict[case_nr_idx]["otn"] = cur_c_line.split("processing status:")[1].split("otn:")[1].strip().lower()
+        elif("arrest date:" in cur_c_line):
             line_increment_c += 1
-            closed_dict[case_nr_idx]["arrest_date"] = cur_c_line.split("arrest dt:")[1].split("disp date:")[0].strip()
-            closed_dict[case_nr_idx]["disp_date"] = cur_c_line.split("arrest dt:")[1].split("disp date:")[1].split("disp judge:")[0].strip()
-            closed_dict[case_nr_idx]["disp_judge"] = cur_c_line.split("arrest dt:")[1].split("disp date:")[1].split("disp judge:")[1].strip()
-        elif("def atty:" in cur_c_line):
+            case_dict[case_nr_idx]["arrest_date"] = cur_c_line[:42].split("arrest date:")[1].strip().lower()
+            case_dict[case_nr_idx]["case_location"] = cur_c_line[42:88].strip().lower()
+            case_dict[case_nr_idx]["disp_event_date"] = cur_c_line[88:].split("disp. event date:")[1].strip().lower()
+        elif("last action:" in cur_c_line):
             line_increment_c += 1
-            closed_dict[case_nr_idx]["def_attorney"] = cur_c_line.split("def atty:")[1].strip()
-        # When we encounter §, it marks the beginning of a new sequence.
+            case_dict[case_nr_idx]["last_action"] = cur_c_line.split("last action:")[1].split("last action date:")[0].strip().lower()
+            case_dict[case_nr_idx]["last_action_date"] = cur_c_line.split("last action:")[1].split("last action date:")[1].strip().lower()
+        elif("next action:" in cur_c_line):
+            line_increment_c += 1
+            case_dict[case_nr_idx]["next_action"] = cur_c_line.split("next action:")[1].split("next action date:")[0].strip().lower()
+            case_dict[case_nr_idx]["next_action_date"] = cur_c_line.split("next action:")[1].split("next action date:")[1].strip().lower()
+        elif("bail type:" in cur_c_line):
+            line_increment_c += 1
+            case_dict[case_nr_idx]["bail_type"] = cur_c_line.split("bail type:")[1].split("bail amount:")[0].strip().lower()
+            case_dict[case_nr_idx]["bail_amount"] = cur_c_line.split("bail type:")[1].split("bail amount:")[1].split("bail status:")[0].strip().lower()
+            case_dict[case_nr_idx]["bail_status"] = cur_c_line.split("bail type:")[1].split("bail amount:")[1].split("bail status:")[1].strip().lower()
         elif("§" in cur_c_line):
-            result_tuple = extract_sqncs_and_sntncs(c_idx, c_lines, c_file)
-            sequence_dict, line_increment_c = result_tuple
-            closed_dict[case_nr_idx].update(sequence_dict)
+            line_increment_c += 1
+            charge_nr += 1
+            charge_nr_idx = "charge_nr_" + str(charge_nr)
+            case_dict[case_nr_idx][charge_nr_idx] = {}
+
+            case_dict[case_nr_idx][charge_nr_idx]["statute"] = cur_c_line[:31].strip()
+            case_dict[case_nr_idx][charge_nr_idx]["grade"] = cur_c_line[31:42].strip()
+            case_dict[case_nr_idx][charge_nr_idx]["description"] = cur_c_line[42:88].strip()
+            case_dict[case_nr_idx][charge_nr_idx]["disposition"] = cur_c_line[88:131].strip()
+            case_dict[case_nr_idx][charge_nr_idx]["counts"] = cur_c_line[131:].strip()
+        elif(re.search("program\s+type", cur_c_line)):
+            # Start at the next line because that is whre the punishment starts.
+            punishment_tuple = extract_punishment(c_idx + 1, c_lines)
+            punishment_dict, line_increment_c = punishment_tuple
+            case_dict[case_nr_idx].update(punishment_dict)
         # If the line does not contain any of the above characters, it's a junk line, and we can skip it.
         else:
             line_increment_c += 1
 
         c_idx = line_increment_c
-
-    return closed_dict, c_idx
-def extract_inactive_active_cases(ia_idx, ia_lines, ia_file):
-    # Initialize starting values.
-    loop_through_ia_cases = True
-    ia_dict = {}
-    case_nr = -1
-    case_nr_idx = "case_" + str(case_nr)
-    line_increment_ia = ia_idx
-
-    while(loop_through_ia_cases):
-        # If we are on the last line of the PDF, we have finished all active/inactive/adjudicated cases.
-        if(ia_idx < len(ia_lines)):
-            cur_ia_line = ia_lines[ia_idx].lower().strip()
-        else:
-            loop_through_ia_cases = False
-            continue
-
-        # If the current line has a case status, we have finished all active/inactive/adjudicated cases.
-        if((("closed" == cur_ia_line or "inactive" == cur_ia_line or "active" == cur_ia_line or "adjudicated" in cur_ia_line) and "continued" not in cur_ia_line)):
-            loop_through_ia_cases = False
-        # Check if the current line is a new county.
-        elif(cur_ia_line in counties):
-            line_increment_ia += 1
-            county = cur_ia_line
-        # If we are not on a new county or new case status, then we are on a new case.
-        # 1st line: Docket Number, Proc. Status, DC Number, and OTN Number.
-        # 2nd line: Arrest date, trial date, legacy number.
-        # 3rd line: Last action, last action date, last action room.
-        # 4th line: Next action, next action date, next action room.
-        # Occasionally, the defense attorney will also be listed (in between the 2nd and 3rd line).
-        # Also occasionally, we can get a disposition date and disposition judge on the 5th line.
-        elif("proc status: " in cur_ia_line):
-            # If the previous line has continued, we need to investigate.
-            if("continued" in ia_lines[ia_idx - 1].lower().strip()):
-                # Check and see if the current docket # equals the docket # in our dictionary. If so, we can skip this line since we already collected this info.
-                # If the current docket # does not equal the docket # in our dictionary, it is new case whose data we need to collect.
-                # Also, if this is the first docket # for this set of case statues, then this is also obviously a new case.
-                cur_line_docket_number = cur_ia_line.split("proc status:")[0].strip()
-                if(case_nr != -1 and cur_line_docket_number == ia_dict[case_nr_idx]["docket_number"]):
-                    line_increment_ia += 1
-                    ia_idx = line_increment_ia
-                    continue
-
-            line_increment_ia += 1
-            case_nr += 1
-            case_nr_idx = "case_" + str(case_nr)
-            ia_dict[case_nr_idx] = {}
-
-            ia_dict[case_nr_idx]["county"] = county
-            ia_dict[case_nr_idx]["docket_number"] = cur_ia_line.split("proc status:")[0].strip()
-            ia_dict[case_nr_idx]["proc_status"] = cur_ia_line.split("proc status:")[1].split("dc no:")[0].strip()
-            ia_dict[case_nr_idx]["dc_nr"] = cur_ia_line.split("proc status:")[1].split("dc no:")[1].split("otn:")[0].strip()
-            ia_dict[case_nr_idx]["otn_nr"] = cur_ia_line.split("proc status:")[1].split("dc no:")[1].split("otn:")[1].strip()
-        elif("arrest dt: " in cur_ia_line):
-            line_increment_ia += 1
-            ia_dict[case_nr_idx]["arrest_date"] = cur_ia_line.split("arrest dt:")[1].split("trial dt:")[0].strip()
-            ia_dict[case_nr_idx]["trial_date"] = cur_ia_line.split("trial dt:")[1].split("legacy no:")[0].strip()
-            ia_dict[case_nr_idx]["legacy_number"] = cur_ia_line.split("trial dt:")[1].split("legacy no:")[1].strip()
-        elif("last action: " in cur_ia_line):
-            line_increment_ia += 1
-            ia_dict[case_nr_idx]["last_action"] = cur_ia_line.split("last action:")[1].split("last action date:")[0].strip()
-            ia_dict[case_nr_idx]["last_action_date"] = cur_ia_line.split("last action:")[1].split("last action date:")[1].split("last action room:")[0].strip()
-            ia_dict[case_nr_idx]["last_action_room"] = cur_ia_line.split("last action:")[1].split("last action date:")[1].split("last action room:")[1].strip()
-        elif("next action: " in cur_ia_line):
-            line_increment_ia += 1
-            ia_dict[case_nr_idx]["next_action"] = cur_ia_line.split("next action:")[1].split("next action date:")[0].strip()
-            ia_dict[case_nr_idx]["next_action_date"] = cur_ia_line.split("next action:")[1].split("next action date:")[1].split("next action room:")[0].strip()
-            ia_dict[case_nr_idx]["next_action_room"] = cur_ia_line.split("next action:")[1].split("next action date:")[1].split("next action room:")[1].strip()
-        elif("def atty: " in cur_ia_line):
-            line_increment_ia += 1
-            ia_dict[case_nr_idx]["def_attorney"] = cur_ia_line.split("def atty:")[1].strip()
-        # When we encounter §, it marks the beginning of a new sequence.
-        elif("§" in cur_ia_line):
-            result_tuple = extract_sqncs_and_sntncs(ia_idx, ia_lines, ia_file)
-            sequence_dict, line_increment_ia = result_tuple
-            ia_dict[case_nr_idx].update(sequence_dict)
-        elif("disp date:" in cur_ia_line):
-            line_increment_ia += 1
-            ia_dict[case_nr_idx]["disp_date"] = cur_ia_line.split("disp date:")[1].split("disp judge:")[0].strip()
-            ia_dict[case_nr_idx]["disp_judge"] = cur_ia_line.split("disp date:")[1].split("disp judge:")[1].strip()
-        # If the line does not contain any of the above characters, it's a junk line, and we can skip it.
-        else:
-            line_increment_ia += 1
-
-        ia_idx = line_increment_ia
-
-    return ia_dict, ia_idx
+    
+    return case_dict, c_idx
 
 # Check if the PDF progress file exists.
 if(os.path.exists(progress_file)):
@@ -329,49 +313,28 @@ for row in pdf_parse_table_df.itertuples():
         break 
 
     # Set-up dictionary for court summary/criminal background data.
-    cs_dict = {}
+    ch_dict = {}
 
     # Loop through the rest of the lines and capture information about an individual's criminal history.
     while(current_line_index < len(lines)):
-        cur_line = lines[current_line_index].lower().strip()
-        new_line_index = ""
-        
-        # Check if the current line is a new set of case (statuses).
-        if(("closed" in cur_line or "inactive" in cur_line or "active" in cur_line or "adjudicated" in cur_line) and "continued" not in cur_line):
-            case_status = cur_line
-            cs_dict[case_status] = {}
+        try:
+            result_tuple = extract_cases(current_line_index, lines)
+            logging.info("Successfully extracted cases.")
+        except Exception as e:
+            logging.error(f"Error in extracting cases. The error is {e}")
+            successfully_parsed_var = False
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            progress_row = pd.DataFrame([{"file_name": row.file_name, "successfully_parsed": False, "time_stamp": timestamp}])
+            progress_row.to_csv(progress_file, index = False, mode = "a", header = False)
+            break
 
-            # Increment the index by 1 because we want to start parsing the line following the case status line.
-            if(case_status == "closed"):
-                try:
-                    result_tuple = extract_closed_cases(current_line_index + 1, lines, row.file_name)
-                    logging.info("Successfully extracted closed cases.")
-                except Exception as e:
-                    logging.error(f"Error in extracting closed cases. The error is {e}")
-                    successfully_parsed_var = False
-                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    progress_row = pd.DataFrame([{"file_name": row.file_name, "successfully_parsed": False, "time_stamp": timestamp}])
-                    progress_row.to_csv(progress_file, index = False, mode = "a", header = False)
-                    break
-            elif(case_status == "inactive" or case_status == "active" or case_status == "adjudicated"):
-                try:
-                    result_tuple = extract_inactive_active_cases(current_line_index + 1, lines, row.file_name)
-                    logging.info("Successfully extracted inactive/active/adjudicated cases.")
-                except Exception as e:
-                    logging.error(f"Error in extracting inactive/active/adjudicated cases. The error is {e}")
-                    successfully_parsed_var = False
-                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    progress_row = pd.DataFrame([{"file_name": row.file_name, "successfully_parsed": False, "time_stamp": timestamp}])
-                    progress_row.to_csv(progress_file, index = False, mode = "a", header = False)
-                    break
-
-            cs_dict[case_status], new_line_index = result_tuple
+        ch_dict, new_line_index = result_tuple
         
         current_line_index = new_line_index
 
     # Update personal demographics with criminal background.
     logging.info("Finished this file.\n")
-    poi_dict.update(cs_dict)
+    poi_dict.update(ch_dict)
 
     # Create name of JSON based on the name of the PDF we are parsing.
     filename = path_to_json + row.file_name.replace(".pdf", ".json")
