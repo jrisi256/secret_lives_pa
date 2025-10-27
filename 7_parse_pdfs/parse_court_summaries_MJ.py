@@ -106,7 +106,7 @@ def extract_punishment(p_idx, p_lines):
 
         # If the current line has processing status, court, county, statewide, or a case status, then it is a new case.
         # This means we've reached the end of punishments.
-        if("processing status:" in cur_p_line or "court:" in cur_p_line or "county:" in cur_p_line or "statewide" == cur_p_line or cur_p_line in counties or cur_p_line in ["active", "inactive", "closed"]):
+        if("processing status:" in cur_p_line or "court:" in cur_p_line or "county:" in cur_p_line or "statewide" == cur_p_line or cur_p_line in counties or cur_p_line in ["active", "inactive", "closed", "adjudicated"]):
             break
         # If the line is only whitespace, or if it has reached the bottom-of-the-page text, ignore it.
         elif(cur_p_line.strip() == "" or "printed:" in cur_p_line or re.search("recent\s+entries\s+made\s+in\s+the", cur_p_line) or re.search("system\s+of\s+the\s+commonwealth\s+of", cur_p_line) or re.search("should\s+not\s+be\s+used\s+in\s+place", cur_p_line) or re.search("employers\s+who\s+do\s+not\s+comply", cur_p_line) or re.search("may\s+be\s+subject\s+to\s+civil", cur_p_line) or re.search("please\s+note\s+that\s+if\s+the", cur_p_line) or re.search("court\s+case\s+management\s+system\s+for\s+this\s+offense", cur_p_line) or re.search("is\s+charged\s+in\s+order\s+to", cur_p_line)):
@@ -178,7 +178,7 @@ def extract_cases(c_idx, c_lines):
                 current_court_county = new_court_county
 
         # Set the case status for this set of cases and check that it is different from the previous case status.
-        if(("closed" == cur_c_line or "inactive" == cur_c_line or "active" == cur_c_line) and cur_c_line != current_case_status):
+        if(("closed" == cur_c_line or "inactive" == cur_c_line or "active" == cur_c_line or "adjudicated" == cur_c_line) and cur_c_line != current_case_status):
             current_case_status = cur_c_line
 
         # I believe statewide cases are always at the end of the PDF so once this is turned on, it stays on.
