@@ -104,20 +104,20 @@ def extract_punishment(p_idx, p_lines):
         else:
             break
 
-        # If the current line has processing status, court, county, statewide, or a case status, then it is a new case.
+        # If the current line has processing status, court, county, statewide, otn:, otn/lotn:, or a case status, then it is a new case.
         # This means we've reached the end of punishments.
-        if("processing status:" in cur_p_line or "court:" in cur_p_line or "county:" in cur_p_line or "statewide" == cur_p_line or cur_p_line in counties or cur_p_line in ["active", "inactive", "closed", "adjudicated"]):
+        if("processing status:" in cur_p_line or "court:" in cur_p_line or "county:" in cur_p_line or "statewide" in cur_p_line or "otn:" in cur_p_line or "otn/lotn:" in cur_p_line or cur_p_line in counties or cur_p_line in ["active", "inactive", "closed", "adjudicated"]):
             break
         # If the line is only whitespace, or if it has reached the bottom-of-the-page text, ignore it.
-        elif(cur_p_line.strip() == "" or "printed:" in cur_p_line or re.search("recent\s+entries\s+made\s+in\s+the", cur_p_line) or re.search("system\s+of\s+the\s+commonwealth\s+of", cur_p_line) or re.search("should\s+not\s+be\s+used\s+in\s+place", cur_p_line) or re.search("employers\s+who\s+do\s+not\s+comply", cur_p_line) or re.search("may\s+be\s+subject\s+to\s+civil", cur_p_line) or re.search("please\s+note\s+that\s+if\s+the", cur_p_line) or re.search("court\s+case\s+management\s+system\s+for\s+this\s+offense", cur_p_line) or re.search("is\s+charged\s+in\s+order\s+to", cur_p_line)):
+        elif(cur_p_line.strip() == "" or "printed:" in cur_p_line or re.search("recent\s+entries\s+made\s+in\s+the", cur_p_line) or re.search("system\s+of\s+the\s+commonwealth\s+of", cur_p_line) or re.search("should\s+not\s+be\s+used\s+in\s+place", cur_p_line) or re.search("employers\s+who\s+do\s+not\s+comply", cur_p_line) or re.search("may\s+be\s+subject\s+to\s+civil", cur_p_line) or re.search("please\s+note\s+that\s+if\s+the", cur_p_line) or re.search("court\s+case\s+management\s+system\s+for\s+this\s+offense", cur_p_line) or re.search("is\s+charged\s+in\s+order\s+to", cur_p_line) or re.search("public\s+court\s+summary", cur_p_line) or "dob:" in cur_p_line or "eyes:" in cur_p_line or " hair:" in cur_p_line or "race:" in cur_p_line):
             p_idx += 1
             continue
         # If we have not hit a new case, then the line is a punishment.
         else:
             program_type = cur_p_line[:55].strip()
             sentence_date = cur_p_line[55:88].strip()
-            sentence_length = cur_p_line[88:141].strip()
-            program_period = cur_p_line[141:].strip()
+            sentence_length = cur_p_line[88:137].strip()
+            program_period = cur_p_line[137:].strip()
 
             # This indicates the punishment line is an overflow line that is still describing the previous punishment's sentence length.
             if(program_type == "" and sentence_date == "" and program_period == "" and punishment_nr_idx != -1):
@@ -251,8 +251,8 @@ def extract_cases(c_idx, c_lines):
             case_dict[case_nr_idx][charge_nr_idx]["statute"] = cur_c_line[:31].strip()
             case_dict[case_nr_idx][charge_nr_idx]["grade"] = cur_c_line[31:42].strip()
             case_dict[case_nr_idx][charge_nr_idx]["description"] = cur_c_line[42:88].strip()
-            case_dict[case_nr_idx][charge_nr_idx]["disposition"] = cur_c_line[88:131].strip()
-            case_dict[case_nr_idx][charge_nr_idx]["counts"] = cur_c_line[131:].strip()
+            case_dict[case_nr_idx][charge_nr_idx]["disposition"] = cur_c_line[88:130].strip()
+            case_dict[case_nr_idx][charge_nr_idx]["counts"] = cur_c_line[130:].strip()
         elif(re.search("program\s+type", cur_c_line)):
             # Start at the next line because that is whre the punishment starts.
             punishment_tuple = extract_punishment(c_idx + 1, c_lines)
