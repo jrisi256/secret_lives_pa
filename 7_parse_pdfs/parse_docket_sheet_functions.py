@@ -204,8 +204,9 @@ def extract_charges(text:str) -> dict[str, str | list]:
 
     while(i < len(split)):
         line = split[i].lower().strip()
-        # Skip blank lines and column header line.
-        if(("seq." in line and "orig seq." in line and "statute" in line and "grade" in line) or line == ""):
+
+        # Skip blank lines, column header line, and junk lines.
+        if(("seq." in line and "orig seq." in line and "statute" in line and "grade" in line) or line == "" or "reflected on these docket sheets" in line or "assume any liability for inaccurate" in line or "docket sheet information should" in line or "who does not comply" in line or "liability as set forth" in line or "cpcms" in line):
             i+=1
         # The § character indicates a new charge.
         elif("§" in line):
@@ -221,12 +222,11 @@ def extract_charges(text:str) -> dict[str, str | list]:
             extracted_info[charge_nr_idx]["description"] = line[56:102].strip()
             extracted_info[charge_nr_idx]["offense_date"] = line[102:118].strip()
             extracted_info[charge_nr_idx]["otn"] = line[118:].strip()
-        # If the line is not a header line, a blank line, or a new charge, it is the description from the previous charge overflowing onto a new line.
+            i += 1
+        # If the line is not a header line, a blank line, a new charge, or a junk line, then it is the description from the previous charge overflowing onto a new line.
         else:
             extracted_info[charge_nr_idx]["description"] = extracted_info[charge_nr_idx]["description"] + " " + line.strip()
-        
-        # Move on to the next line.
-        i+=1
+            i += 1
     
     return(extracted_info)
 
@@ -236,7 +236,8 @@ def extract_charges(text:str) -> dict[str, str | list]:
 # Return:
 #   dict: A dictionary containing the extracted information.
 #
-# Sentencing information follows a somewhat straightforward pattern. I believe it has a nested structure where each section will only appear if the previous section appears.
+# Sentencing information follows a somewhat straightforward pattern. It has a nested structure where each section should only appear if the previous section appears.
+# However, the nested structure is not always respected. See ds_Allegheny_CP_02_CR_0012909_2014.
 # 1st line/section is the disposition.
 # 2nd line/section is the case event, disposition date and final disposition.
 # 3rd line/section is the description, offense disposition, grade, and section. Sometimes the description over flows on to the next line (ignored).
@@ -250,6 +251,9 @@ def extract_sentencing(text:str) -> dict[str, str | list]:
     
     # Line counter.
     i = 0
+
+    # Possible punishments.
+    punishments = "confinement|probation|ipp|ard|ard - dui|drug court"
 
     # Counters for specific elements of the dictionary.
     case_event_nr = -1
@@ -267,9 +271,8 @@ def extract_sentencing(text:str) -> dict[str, str | list]:
     while(i < len(split)):
         line = split[i].lower().strip()
         
-        # If you see a date on a line that does not have: 1) a name, 2) a day/week/month/year (indicating a punishment), or 3) printed: (end of page)
-        # then it is the case event/disposition date/final disposition line (2nd element).
-        if(re.search(r"\d{2}/\d{2}/\d{4}", line) and not re.search("^[A-Za-z]+\s*,\s*[A-Za-z]+", line) and not re.search("day|week|month|year", line) and not re.search("printed:", line)):
+        # If you see a date on a line that does not have: 1) a name, 2) a hour/day/week/month/year (indicating a punishment), or 3) printed: (end of page), and 4) does not come in in the punishment block, then it is the case event/disposition date/final disposition line (2nd element).
+        if(re.search(r"\d{2}/\d{2}/\d{4}", line) and not re.search("^[A-Za-z'\-]+\s*,\s*[A-Za-z\-]+", line) and not re.search("hour|day|week|month|year", line) and not re.search("printed:", line) and not punish_start_date):
             case_event_nr += 1
             case_event_idx = "case_event_nr_" + str(case_event_nr)
             extracted_info[case_event_idx] = {}
@@ -311,7 +314,7 @@ def extract_sentencing(text:str) -> dict[str, str | list]:
             extracted_info[case_event_idx][offense_idx]["grade"] = line[100:110].strip()
             extracted_info[case_event_idx][offense_idx]["offense_section"] = line[110:].strip()
         # If you see a date and a name, this is the line with the judge who handed down the sentence (4th element).
-        elif(re.search(r"\d{2}/\d{2}/\d{4}", line) and re.search("^[A-Za-z]+\s*,\s*[A-Za-z]+", line)):
+        elif(re.search(r"\d{2}/\d{2}/\d{4}", line) and re.search("^[A-Za-z'\-]+\s*,\s*[A-Za-z'\-]+", line)):
             sentence_nr += 1
             sentence_idx = "sentence_nr_" + str(sentence_nr)
             extracted_info[case_event_idx][offense_idx][sentence_idx] = {}
@@ -324,20 +327,28 @@ def extract_sentencing(text:str) -> dict[str, str | list]:
             extracted_info[case_event_idx][offense_idx][sentence_idx]["sentencing_judge"] = line[:60].strip()
             extracted_info[case_event_idx][offense_idx][sentence_idx]["sentencing_date"] = line[60:100].strip()
             extracted_info[case_event_idx][offense_idx][sentence_idx]["credit_for_time_served"] = line[100:].strip()
-        # If you find day, week, month or year and a date, this is the first line of the sentence length (5th element).
-        elif(re.search(r"day|week|month|year", line) and re.search(r"\d{2}/\d{2}/\d{4}", line)):
+        # If you find hour, day, week, month or year and a date or a punishment from the list of punishments, this is the first line of the sentence length (5th element).
+        # Unfortunately, not every punishment has a start date.
+        elif(re.search(r"hour|day|week|month|year", line) and (re.search(r"\d{2}/\d{2}/\d{4}", line) or re.search(punishments, line))):
             # Move the punishment counter up 1 and initialize the punishment dictionary.
             punish_nr += 1
             punish_idx = "punish_nr_" + str(punish_nr)
+
+            # Because the nested hierarchy is not always respected, you can sometimes get a punishment without a sentence.
+            if(sentence_idx == "sentence_nr_-1"):
+                sentence_nr = 0
+                sentence_idx = "sentence_nr_" + str(sentence_nr)
+                extracted_info[case_event_idx][offense_idx][sentence_idx] = {}
+
             extracted_info[case_event_idx][offense_idx][sentence_idx][punish_idx] = {}
             
             # Signal we are in the punishment block.
             punish_start_date = True
             
             # Set initial conditions to blank and extract other information.
-            extracted_info[case_event_idx][offense_idx][sentence_idx][punish_idx]["punishment_conditions"] = ""
             extracted_info[case_event_idx][offense_idx][sentence_idx][punish_idx]["punishment_type"] = line[:60].strip()
             extracted_info[case_event_idx][offense_idx][sentence_idx][punish_idx]["punishment_start_date"] = line[101:].strip()
+            extracted_info[case_event_idx][offense_idx][sentence_idx][punish_idx]["punishment_conditions"] = ""
         
             if(re.search(r"min of", line)):
                 extracted_info[case_event_idx][offense_idx][sentence_idx][punish_idx]["min_punishment"] = line[60:101].strip()
@@ -346,11 +357,18 @@ def extract_sentencing(text:str) -> dict[str, str | list]:
             # Sometimes a punishment will not be given a minimum or maximum but just the length
             else:
                 extracted_info[case_event_idx][offense_idx][sentence_idx][punish_idx]["punishment"] = line[60:101].strip()
-        # Sometimes, the punishment will just be 'no further penalty'.
-        elif(re.search("no further penalty", line)):
+        # Sometimes, the punishment will just be 'no further penalty' or 'merged'.
+        elif(re.search("no further penalty|merged", line)):
             # Move the punishment counter up 1 and initialize the punishment dictionary.
             punish_nr += 1
             punish_idx = "punish_nr_" + str(punish_nr)
+
+            # Because the nested hierarchy is not always respected, you can sometimes get a punishment without a sentence.
+            if(sentence_idx == "sentence_nr_-1"):
+                sentence_nr = 0
+                sentence_idx = "sentence_nr_" + str(sentence_nr)
+                extracted_info[case_event_idx][offense_idx][sentence_idx] = {}
+
             extracted_info[case_event_idx][offense_idx][sentence_idx][punish_idx] = {}
             
             # Signal we are in the punishment block.
