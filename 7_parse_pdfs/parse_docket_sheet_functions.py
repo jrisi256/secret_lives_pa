@@ -3,6 +3,77 @@ import json
 import pandas as pd
 import pdfplumber
 
+# Extract text from PDF.
+# Args:
+#   pdf_path (str): File path to the PDF.
+# Returns:
+#   string: A single string which is the concatenated version of all pages and lines in the PDF.
+def extract_text_from_pdf(pdf_path: str) -> str:
+    # Open up the PDF and read in each page.
+    pages = pdfplumber.open(pdf_path).pages
+    # List comprehension. Structure is expression FOR x IN y.
+    # Execute expression on each x in y.
+    # Here we extract the text from each page. Then we separate each text element with the new line character.
+    alltext = "\n".join([page.extract_text(keep_blank_chars=True, layout=True, x_density = 3.9, y_density = 13) for page in pages])
+    return alltext
+
+# Extracts sections from the document text.
+# Args:
+#   text (str): The text of the document.
+# Returns:
+#   dict: A dictionary containing the extracted sections with the section headers as keys.
+def extract_sections(text: str) -> dict[str, str]:
+    # Find lines that contain 4 or more upper-case characters and/or slashes and/or hyphens (and are bookended by white space).
+    # These will be the section headers.
+    section_header_pattern = re.compile(r"^\s*[A-Z\s\/\-]{4,}\s*$", re.MULTILINE)
+
+    # Find all section headers and their starting character index.
+    matches = re.finditer(section_header_pattern, text)
+
+    # Iterate through each match and find the starting character index as well as the section header.
+    headers = [(match.start(), match.group().strip()) for match in matches]
+    # Drop any potential headers that are just empty whitespace.
+    headers = [h for h in headers if len(h[1]) > 0]
+
+    # Dictionary to store sections
+    sections = {}
+
+    # Iterate over headers and extract sections.
+    for i in range(len(headers)):
+        start_index = headers[i][0]
+        header = headers[i][1]
+        # Set the end index to be the start index of the next section header (or the end of the text file).
+        end_index = headers[i + 1][0] if i + 1 < len(headers) else len(text)
+
+        # Extract section text.
+        section_text = text[start_index:end_index].strip()
+
+        # Remove the header from the section text.
+        section_text = section_text[len(header):].strip()
+
+        # Sometimes, section headers do not carry over to new pages. To capture the information which overflows onto the next page, set the criminal docket header to the previous substantive header.
+        # And then remove the junk from the top of the criminal docket header.
+        if "CRIMINAL DOCKET" in header and i - 2 > 0:
+            header = headers[i-2][1]
+            section_text_list = [line for line in section_text.split("\n") if line.strip() != ""]
+            section_text = "\n".join(section_text_list[5:])
+
+        # Reduce different versions of the same header to a single version
+        if "ATTORNEY INFORMATION" in header:
+            header = "ATTORNEY INFORMATION"
+        elif "BAIL INFORMATION" in header:
+            header = "BAIL"
+            
+        # Add the current section header to our dictionary of sections.
+        # setdefault searches for the key in your dictionary if it exists.
+        # If it does exist, it returns the value associated with the key. If it does not exist, the key is inserted with the provided default value.
+        sections.setdefault(header, "")
+
+        # Add the section text to the dictionary under the header key.
+        sections[header] += f"\n{section_text}"
+
+    return sections
+
 # Extracts the defendant's information from the DEFENDANT INFORMATION section.
 # Args:
 #   text (str): The text containing the defendant's information.
@@ -739,3 +810,157 @@ def extract_related_cases(text:str) -> dict[str, str | list]:
         i += 1
     
     return(related_cases_dict)
+
+# Extract payment plan summary from the PAYMENT PLAN SUMMARY section.
+# Args:
+#   text(str): The text containing the payment plan summary.
+# Return:
+#   dict: A dictionary containing the payment plan summary.
+def extract_payment_plan_summary(text:str) -> dict[str, str | list]:
+    split = text.split("\n")
+    i = 0
+    payment_plan_dict = {}
+    payment_plan_info_block = False
+    payment_plan_history_block = False
+    payment_nr = -1
+    payment_idx = "payment_nr_" + str(payment_nr)
+    
+    while(i < len(split)):
+        line = split[i].lower().strip()
+
+        if("payment plan no" in line or "responsible participant" in line):
+            payment_plan_info_block = True
+            payment_plan_history_block = False
+        elif("payment plan history:" in line):
+            payment_plan_info_block = False
+            payment_plan_history_block = True
+
+        if(payment_plan_info_block and "payment plan no" not in line and "responsible participant" not in line and "reflected on these docket sheets" not in line and "assume any liability for inaccurate" not in line and "docket sheet information should" not in line and "who does not comply" not in line and "liability as set forth" not in line and "cpcms" not in line and line.strip() != ""):
+            # If there is a date or a payment play ID, then it is the first line of the payment plan information.
+            if(re.search(r"\d{2}/\d{2}/\d{4}", line) or re.search(r"\d{2}-\d{4}-\w+", line)):
+                payment_plan_dict["payment_plan_nr"] = line[:31].strip()
+                payment_plan_dict["payment_plan_freq"] = line[31:64].strip()
+                payment_plan_dict["next_due_date"] = line[64:88].strip()
+                payment_plan_dict["active"] = line[88:123].strip()
+                payment_plan_dict["overdue_amount"] = line[123:].strip()
+            else:
+                payment_plan_dict["participant"] = line[:88].strip()
+                payment_plan_dict["suspended"] = line[88:124].strip()
+                payment_plan_dict["next_due_amount"] = line[123:].strip()
+        elif(payment_plan_history_block and "payment plan no" not in line and "responsible participant" not in line and "on these docket sheets" not in line and "assume any liability for inaccurate" not in line and "docket sheet information should" not in line and "who does not comply" not in line and "liability as set forth" not in line and "cpcms" not in line and "payment plan history:" not in line and line.strip() != ""):
+            payment_nr += 1
+            payment_idx = "payment_nr_" + str(payment_nr)
+            payment_plan_dict[payment_idx] = {}
+
+            payment_plan_dict[payment_idx]["receipt_date"] = line[:33].strip()
+            payment_plan_dict[payment_idx]["payor_name"] = line[33:61].strip()
+            payment_plan_dict[payment_idx]["participant_role"] = line[61:83].strip()
+            payment_plan_dict[payment_idx]["amount_paid"] = line[83:].strip()
+
+        i += 1
+    
+    return(payment_plan_dict)
+
+def extract_all(pdf_path: str) -> dict[str, str | dict]:
+    # Join together all pages and lines into one string.
+    text = extract_text_from_pdf(pdf_path)
+
+    # Partition the text by sections.
+    sections = extract_sections(text)
+
+    case_info = (
+        extract_case_information(sections.get("CASE INFORMATION", ""))
+        if "CASE INFORMATION" in sections
+        else None
+    )
+
+    defendant_info = (
+        # The second argument in get() is the default value returned if the key is not found in the dictionary.
+        extract_defendant_information(sections.get("DEFENDANT INFORMATION", ""))
+        if "DEFENDANT INFORMATION" in sections
+        else None
+    )
+    
+    charges = (
+        extract_charges(sections.get("CHARGES", ""))
+        if "CHARGES" in sections
+        else None
+    )
+
+    sentencing = (
+        extract_sentencing(sections.get("DISPOSITION SENTENCING/PENALTIES", ""))
+        if "DISPOSITION SENTENCING/PENALTIES" in sections
+        else None
+    )
+
+    confinement = (
+        extract_confinement(sections.get("CONFINEMENT INFORMATION", ""))
+        if "CONFINEMENT INFORMATION" in sections
+        else None
+    )
+
+    status_info = (
+        extract_status(sections.get("STATUS INFORMATION", ""))
+        if "STATUS INFORMATION" in sections
+        else None
+    )
+
+    calendar_events = (
+        extract_calendar_events(sections.get("CALENDAR EVENTS", ""))
+        if "CALENDAR EVENTS" in sections
+        else None
+    )
+
+    participants = (
+        extract_case_participants(sections.get("CASE PARTICIPANTS", ""))
+        if "CASE PARTICIPANTS" in sections
+        else None
+    )
+
+    attorneys = (
+        extract_attorney_info(sections.get("ATTORNEY INFORMATION", ""))
+        if "ATTORNEY INFORMATION" in sections
+        else None
+    )
+
+    bail = (
+        extract_bail(sections.get("BAIL", ""))
+        if "BAIL" in sections
+        else None
+    )
+
+    case_financial_info = (
+        extract_case_financial_info(sections.get("CASE FINANCIAL INFORMATION", ""))
+        if "CASE FINANCIAL INFORMATION" in sections
+        else None
+    )
+
+    payment_plan_summary = (
+        extract_payment_plan_summary(sections.get("PAYMENT PLAN SUMMARY", ""))
+        if "PAYMENT PLAN SUMMARY" in sections
+        else None
+    )
+
+    related_cases = (
+        extract_related_cases(sections.get("RELATED CASES", ""))
+        if "RELATED CASES" in sections
+        else None
+    )
+
+    return(
+        {
+            "case_info": case_info,
+            "related_cases": related_cases,
+            "status_info": status_info,
+            "calendar_events": calendar_events,
+            "confinement": confinement,
+            "defendant_info": defendant_info,
+            "participants": participants,
+            "bail": bail,
+            "charges": charges,
+            "sentencing": sentencing,
+            "attorneys": attorneys,
+            "payment_plan_summary": payment_plan_summary,
+            "case_financial_info": case_financial_info            
+        }
+    )
