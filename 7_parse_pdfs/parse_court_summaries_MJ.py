@@ -108,7 +108,7 @@ def extract_punishment(p_idx, p_lines):
 
         # If the current line has processing status, court, county, statewide, otn:, otn/lotn:, or a case status, then it is a new case.
         # This means we've reached the end of punishments.
-        if("processing status:" in cur_p_line or "court:" in cur_p_line or "county:" in cur_p_line or "statewide" in cur_p_line or "otn:" in cur_p_line or "otn/lotn:" in cur_p_line or cur_p_line in counties or cur_p_line in ["active", "inactive", "closed", "adjudicated"]):
+        if("processing status:" in cur_p_line or "court:" in cur_p_line or "county:" in cur_p_line or "statewide" in cur_p_line or "otn:" in cur_p_line or "otn/lotn:" in cur_p_line or cur_p_line in counties or "active" in cur_p_line or "inactive" in cur_p_line or "closed" in cur_p_line or "adjudicated" in cur_p_line):
             break
         # If the line is only whitespace, or if it has reached the bottom-of-the-page text, ignore it.
         elif(cur_p_line.strip() == "" or "printed:" in cur_p_line or re.search("recent\s+entries\s+made\s+in\s+the", cur_p_line) or re.search("system\s+of\s+the\s+commonwealth\s+of", cur_p_line) or re.search("should\s+not\s+be\s+used\s+in\s+place", cur_p_line) or re.search("employers\s+who\s+do\s+not\s+comply", cur_p_line) or re.search("may\s+be\s+subject\s+to\s+civil", cur_p_line) or re.search("please\s+note\s+that\s+if\s+the", cur_p_line) or re.search("court\s+case\s+management\s+system\s+for\s+this\s+offense", cur_p_line) or re.search("is\s+charged\s+in\s+order\s+to", cur_p_line) or re.search("public\s+court\s+summary", cur_p_line) or "dob:" in cur_p_line or "eyes:" in cur_p_line or " hair:" in cur_p_line or "race:" in cur_p_line):

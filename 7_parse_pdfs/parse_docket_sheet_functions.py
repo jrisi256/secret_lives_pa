@@ -147,7 +147,16 @@ def extract_case_information(text: str) -> dict[str, str | list]:
         elif("initial issuing authority:" in line or "final issuing authority:" in line):
             extracted_info["initial_issuing_authority"] = line.split("initial issuing authority:")[1].split("final issuing authority:")[0].strip()
             extracted_info["final_issuing_authority"] = line.split("initial issuing authority:")[1].split("final issuing authority:")[1].strip()
-            i += 1
+            j = 1
+
+            # Check the next line to see if initial issuing authority and/or final issuing authority spilled over into the next line.
+            while("arresting agency:" not in split[i + j].lower() and "arresting officer:" not in split[i + j].lower()):
+                lookahead_line = split[i + j].lower()
+                extracted_info["initial_issuing_authority"] = extracted_info["initial_issuing_authority"] + " " + lookahead_line[:66].strip()
+                extracted_info["final_issuing_authority"] = extracted_info["final_issuing_authority"] + " " + lookahead_line[66:].strip()
+                j += 1
+
+            i += 1 + (j - 1)
         elif("arresting agency" in line or "arresting officer" in line):
             extracted_info["arresting_agency"] = line.split("arresting agency:")[1].split("arresting officer:")[0].strip()
             extracted_info["arresting_officer"] = line.split("arresting agency:")[1].split("arresting officer:")[1].strip()
@@ -230,21 +239,6 @@ def extract_charges(text:str) -> dict[str, str | list]:
     
     return(extracted_info)
 
-# Extracts the sentencing and disposition information from DISPOSITION/SENTENCING PENALTIES section.
-# Args:
-#   text(str): The text containing the sentencing information.
-# Return:
-#   dict: A dictionary containing the extracted information.
-#
-# Sentencing information follows a somewhat straightforward pattern. It has a nested structure where each section should only appear if the previous section appears.
-# However, the nested structure is not always respected. See ds_Allegheny_CP_02_CR_0012909_2014.
-# 1st line/section is the disposition.
-# 2nd line/section is the case event, disposition date and final disposition.
-# 3rd line/section is the description, offense disposition, grade, and section. Sometimes the description over flows on to the next line (ignored).
-# 4th line/section is judge, sentencing date, and credit for time served.
-# 5th line/section is sentence type, sentence period, and start date of punishment. This section usually goes on for 1 to 3 lines indicating the time range of the punishment.
-# 6th line/section is sentencing conditions which can go on for an indefinite number of lines.
-# 7th line/section is linked sentences which can also go on for an indefinite number of lines.
 def extract_sentencing(text:str) -> dict[str, str | list]:
     split = text.split("\n")
     extracted_info = {}
@@ -270,9 +264,11 @@ def extract_sentencing(text:str) -> dict[str, str | list]:
     
     while(i < len(split)):
         line = split[i].lower().strip()
+        disp_date = line[60:98].strip()
         
-        # If you see a date on a line that does not have: 1) a name, 2) a hour/day/week/month/year (indicating a punishment), or 3) printed: (end of page), and 4) does not come in in the punishment block, then it is the case event/disposition date/final disposition line (2nd element).
-        if(re.search(r"\d{2}/\d{2}/\d{4}", line) and not re.search("^[A-Za-z'\-]+\s*,\s*[A-Za-z\-]+", line) and not re.search("hour|day|week|month|year", line) and not re.search("printed:", line) and not punish_start_date):
+        # If you see a date on a line that does not have: 1) a name, 2) a hour/day/week/month/year (indicating a punishment), or 3) printed: (end of page),
+        # then it is the case event/disposition date/final disposition line (2nd element).
+        if(re.search(r"^\d{2}/\d{2}/\d{4}$", disp_date) and not re.search("^[A-Za-z'\-]+\s*,\s*[A-Za-z\-]+", line) and not re.search("hour|day|week|month|year", line) and not re.search("printed:", line)):
             case_event_nr += 1
             case_event_idx = "case_event_nr_" + str(case_event_nr)
             extracted_info[case_event_idx] = {}
@@ -411,6 +407,8 @@ def extract_sentencing(text:str) -> dict[str, str | list]:
 def extract_confinement(text:str) -> dict[str, str | list]:
     split = text.split("\n")
     extracted_info = {}
+    confinement_nr = -1
+    confinement_idx = "confinement_nr_" + str(confinement_nr)
     
     # Line counter.
     i = 0
@@ -420,11 +418,15 @@ def extract_confinement(text:str) -> dict[str, str | list]:
 
         # Capture confinement information.
         if("confinement" not in line and "known as of" not in line and "cpcms" not in line and "recent entries" not in line and "administrative" not in line and "docket sheet" not in line and "comply" not in line and "set forth" not in line and line != ""):
-            extracted_info["confinement_date"] = line[:19].strip()
-            extracted_info["confinement_type"] = line[19:55].strip()
-            extracted_info["confinement_location"] = line[55:89].strip()
-            extracted_info["confinement_reason"] = line[89:122].strip()
-            extracted_info["in_custody"] = line[122:].strip()
+            confinement_nr += 1
+            confinement_idx = "confinement_nr_" + str(confinement_nr)
+            extracted_info[confinement_idx] = {}
+
+            extracted_info[confinement_idx]["confinement_date"] = line[:19].strip()
+            extracted_info[confinement_idx]["confinement_type"] = line[19:55].strip()
+            extracted_info[confinement_idx]["confinement_location"] = line[55:89].strip()
+            extracted_info[confinement_idx]["confinement_reason"] = line[89:122].strip()
+            extracted_info[confinement_idx]["in_custody"] = line[122:].strip()
         
         i += 1
 
@@ -479,28 +481,29 @@ def extract_calendar_events(text:str) -> dict[str, str | list]:
     event_idx = "event_nr_" + str(event_nr)
 
     while(i < len(split)):
-        line = split[i].lower().strip()
+        line = split[i].lower()
         
-        # If we find a date on the line, then it is a calendar event.
-        if(re.search(r"\d{2}/\d{2}/\d{4}", line)):
+        # If we find a date on the line (that is not at the end of the document), then it is a calendar event.
+        if(re.search(r"\d{2}/\d{2}/\d{4}", line) and "printed" not in line):
             event_nr += 1
             event_idx = "event_nr_" + str(event_nr)
             extracted_info[event_idx] = {}
 
-            extracted_info[event_idx]["event_type"] = line[:26].strip()
-            extracted_info[event_idx]["start_date"] = line[26:41].strip()
-            extracted_info[event_idx]["start_time"] = line[41:54].strip()
-            extracted_info[event_idx]["room"] = line[54:79].strip()
-            extracted_info[event_idx]["judge"] = line[79:116].strip()
-            extracted_info[event_idx]["schedule_status"] = line[115:].strip()
+            extracted_info[event_idx]["event_type"] = line[:37].strip()
+            extracted_info[event_idx]["start_date"] = line[37:49].strip()
+            extracted_info[event_idx]["start_time"] = line[49:65].strip()
+            extracted_info[event_idx]["room"] = line[65:90].strip()
+            extracted_info[event_idx]["judge"] = line[90:127].strip()
+            extracted_info[event_idx]["schedule_status"] = line[127:].strip()
+
         # If we do not find a date, but it is not the end of the document nor is it the header row or an empty row, then it is an overflow row.
         elif("case calendar" not in line and "event type" not in line and "cpcms" not in line and "recent entries" not in line and "administrative" not in line and "docket sheet" not in line and "comply" not in line and "set forth" not in line and line != ""):
-            extracted_info[event_idx]["event_type"] = extracted_info[event_idx]["event_type"] + " " + line[:26].strip()
-            extracted_info[event_idx]["start_date"] = extracted_info[event_idx]["start_date"] + " " + line[26:41].strip()
-            extracted_info[event_idx]["start_time"] = extracted_info[event_idx]["start_time"] + " " + line[41:54].strip()
-            extracted_info[event_idx]["room"] = extracted_info[event_idx]["room"] + " " + line[54:79].strip()
-            extracted_info[event_idx]["judge"] = extracted_info[event_idx]["judge"] + " " + line[79:116].strip()
-            extracted_info[event_idx]["schedule_status"] = extracted_info[event_idx]["schedule_status"] + " " + line[115:].strip()
+            extracted_info[event_idx]["event_type"] = extracted_info[event_idx]["event_type"] + " " + line[:37].strip()
+            extracted_info[event_idx]["start_date"] = extracted_info[event_idx]["start_date"] + " " + line[37:49].strip()
+            extracted_info[event_idx]["start_time"] = extracted_info[event_idx]["start_time"] + " " + line[49:65].strip()
+            extracted_info[event_idx]["room"] = extracted_info[event_idx]["room"] + " " + line[65:90].strip()
+            extracted_info[event_idx]["judge"] = extracted_info[event_idx]["judge"] + " " + line[90:127].strip()
+            extracted_info[event_idx]["schedule_status"] = extracted_info[event_idx]["schedule_status"] + " " + line[127:].strip()
         
         i += 1
     
@@ -604,13 +607,13 @@ def extract_attorney_info(text:str) -> dict[str, str | list]:
             attorney_dict["prosecutors"][prosecutor_idx]["address"] = p_line.split("address:")[1].strip()
         elif("cpcms" not in p_line and "recent entries" not in p_line and "administrative" not in p_line and "docket sheet" not in p_line and "comply" not in p_line and "set fort" not in p_line and "commonwealth" not in p_line and "pennsylvania" not in p_line and "these reports" not in p_line and "information" not in p_line):
             if(prosecutor_name_block):
-                attorney_dict["prosecutors"][prosecutor_idx]["name"] = attorney_dict["prosecutors"][prosecutor_idx]["name"] + " " + p_line
+                attorney_dict["prosecutors"][prosecutor_idx]["name"] = attorney_dict["prosecutors"][prosecutor_idx]["name"] + "|" + p_line
             elif(prosecutor_scNr_block):
-                attorney_dict["prosecutors"][prosecutor_idx]["supreme_court_nr"] = attorney_dict["prosecutors"][prosecutor_idx]["supreme_court_nr"] + " " + p_line
+                attorney_dict["prosecutors"][prosecutor_idx]["supreme_court_nr"] = attorney_dict["prosecutors"][prosecutor_idx]["supreme_court_nr"] + "|" + p_line
             elif(prosecutor_phoneNr_block):
-                attorney_dict["prosecutors"][prosecutor_idx]["phone_nr"] = attorney_dict["prosecutors"][prosecutor_idx]["phone_nr"] + " " + p_line
+                attorney_dict["prosecutors"][prosecutor_idx]["phone_nr"] = attorney_dict["prosecutors"][prosecutor_idx]["phone_nr"] + "|" + p_line
             elif(prosecutor_address_block):
-                attorney_dict["prosecutors"][prosecutor_idx]["address"] = attorney_dict["prosecutors"][prosecutor_idx]["address"] + " " + p_line
+                attorney_dict["prosecutors"][prosecutor_idx]["address"] = attorney_dict["prosecutors"][prosecutor_idx]["address"] + "|" + p_line
 
         # Defense information.
         if("name:" in d_line):
@@ -666,17 +669,17 @@ def extract_attorney_info(text:str) -> dict[str, str | list]:
             attorney_dict["defense"][defense_idx]["representing"] = d_line.split("representing:")[1].strip()
         elif("cpcms" not in d_line and "recent entries" not in d_line and "administrative" not in d_line and "docket sheet" not in d_line and "comply" not in d_line and "set fort" not in d_line and "commonwealth" not in d_line and "pennsylvania" not in d_line and "these reports" not in d_line and "information" not in d_line and "printed" not in d_line):
             if(defense_name_block):
-                attorney_dict["defense"][defense_idx]["name"] = attorney_dict["defense"][defense_idx]["name"] + " " + d_line
+                attorney_dict["defense"][defense_idx]["name"] = attorney_dict["defense"][defense_idx]["name"] + "|" + d_line
             elif(defense_scNr_block):
-                attorney_dict["defense"][defense_idx]["supreme_court_nr"] = attorney_dict["defense"][defense_idx]["supreme_court_nr"] + " " + d_line
+                attorney_dict["defense"][defense_idx]["supreme_court_nr"] = attorney_dict["defense"][defense_idx]["supreme_court_nr"] + "|" + d_line
             elif(defense_phoneNr_block):
-                attorney_dict["defense"][defense_idx]["phone_nr"] = attorney_dict["defense"][defense_idx]["phone_nr"] + " " + d_line
+                attorney_dict["defense"][defense_idx]["phone_nr"] = attorney_dict["defense"][defense_idx]["phone_nr"] + "|" + d_line
             elif(defense_address_block):
-                attorney_dict["defense"][defense_idx]["address"] = attorney_dict["defense"][defense_idx]["address"] + " " + d_line
+                attorney_dict["defense"][defense_idx]["address"] = attorney_dict["defense"][defense_idx]["address"] + "|" + d_line
             elif(defense_repStatus_block):
-                attorney_dict["defense"][defense_idx]["rep_status"] = attorney_dict["defense"][defense_idx]["rep_status"] + " " + d_line
+                attorney_dict["defense"][defense_idx]["rep_status"] = attorney_dict["defense"][defense_idx]["rep_status"] + "|" + d_line
             elif(defense_representing_block):
-                attorney_dict["defense"][defense_idx]["representing"] = attorney_dict["defense"][defense_idx]["representing"] + " " + d_line
+                attorney_dict["defense"][defense_idx]["representing"] = attorney_dict["defense"][defense_idx]["representing"] + "|" + d_line
 
         i += 1
     
@@ -717,18 +720,23 @@ def extract_bail(text:str) -> dict[str, str | list]:
             bail_block = False
 
         if(bail_block and "cpcms" not in line and "recent entries" not in line and "administrative" not in line and "docket sheet" not in line and "comply" not in line and "set fort" not in line and "bail action" not in line and "court case" not in line and "commonwealth" not in line and line.strip() != ""):
-            # Initialize starting values.
-            bail_nr += 1
-            bail_idx = "bail_nr_" + str(bail_nr)
-            bail_dict["bail_info"][bail_idx] = {}
+            # If the bail date is blank, the bail action overflowed onto the next line.
+            if(line[38:65].strip() == ""):
+                bail_dict["bail_info"][bail_idx]["bail_action"] = bail_dict["bail_info"][bail_idx]["bail_action"] +  " " + line[:38].strip()
+            # Otherwise, continue collecting the surety information as normal.
+            else:
+                # Initialize starting values.
+                bail_nr += 1
+                bail_idx = "bail_nr_" + str(bail_nr)
+                bail_dict["bail_info"][bail_idx] = {}
 
-            # Set values for bail.
-            bail_dict["bail_info"][bail_idx]["bail_action"] = line[:38].strip()
-            bail_dict["bail_info"][bail_idx]["date"] = line[38:65].strip()
-            bail_dict["bail_info"][bail_idx]["bail_type"] = line[65:88].strip()
-            bail_dict["bail_info"][bail_idx]["originating_court"] = line[88:118].strip()
-            bail_dict["bail_info"][bail_idx]["percentage"] = line[118:132].strip()
-            bail_dict["bail_info"][bail_idx]["amount"] = line[132:].strip()
+                # Set values for bail.
+                bail_dict["bail_info"][bail_idx]["bail_action"] = line[:38].strip()
+                bail_dict["bail_info"][bail_idx]["date"] = line[38:65].strip()
+                bail_dict["bail_info"][bail_idx]["bail_type"] = line[65:88].strip()
+                bail_dict["bail_info"][bail_idx]["originating_court"] = line[88:118].strip()
+                bail_dict["bail_info"][bail_idx]["percentage"] = line[118:132].strip()
+                bail_dict["bail_info"][bail_idx]["amount"] = line[132:].strip()
         elif(surety_block and "cpcms" not in line and "recent entries" not in line and "administrative" not in line and "docket sheet" not in line and "comply" not in line and "set fort" not in line and "surety type" not in line and "court case" not in line and "commonwealth" not in line and line.strip() != ""):
             # If the surety type is blank, the surety name overflowed onto the next line.
             if(line[:27].strip() == ""):
@@ -783,9 +791,9 @@ def extract_case_financial_info(text:str) -> dict[str, str | list]:
                 fee_idx = "fee_nr_" + str(fee_nr)
                 case_financial_dict[fee_idx] = {}
 
-                case_financial_dict[fee_idx]["description"] = line[:62].strip()
-                case_financial_dict[fee_idx]["assessment"] = line[62:83].strip()
-                case_financial_dict[fee_idx]["payment"] = line[83:99].strip()
+                case_financial_dict[fee_idx]["description"] = line[:60].strip()
+                case_financial_dict[fee_idx]["assessment"] = line[60:78].strip()
+                case_financial_dict[fee_idx]["payment"] = line[78:99].strip()
                 case_financial_dict[fee_idx]["adjustment"] = line[99:116].strip()
                 case_financial_dict[fee_idx]["non_monetary_payment"] = line[116:133].strip()
                 case_financial_dict[fee_idx]["balance"] = line[133:].strip()
@@ -844,7 +852,7 @@ def extract_payment_plan_summary(text:str) -> dict[str, str | list]:
     payment_idx = "payment_nr_" + str(payment_nr)
     
     while(i < len(split)):
-        line = split[i].lower().strip()
+        line = split[i].lower()
 
         if("payment plan no" in line or "responsible participant" in line):
             payment_plan_info_block = True
@@ -854,26 +862,27 @@ def extract_payment_plan_summary(text:str) -> dict[str, str | list]:
             payment_plan_history_block = True
 
         if(payment_plan_info_block and "payment plan no" not in line and "responsible participant" not in line and "reflected on these docket sheets" not in line and "assume any liability for inaccurate" not in line and "docket sheet information should" not in line and "who does not comply" not in line and "liability as set forth" not in line and "cpcms" not in line and line.strip() != ""):
-            # If there is a date or a payment play ID, then it is the first line of the payment plan information.
+            # If there is a date or a payment plan ID, then it is the first line of the payment plan information.
             if(re.search(r"\d{2}/\d{2}/\d{4}", line) or re.search(r"\d{2}-\d{4}-\w+", line)):
-                payment_plan_dict["payment_plan_nr"] = line[:31].strip()
-                payment_plan_dict["payment_plan_freq"] = line[31:64].strip()
-                payment_plan_dict["next_due_date"] = line[64:88].strip()
-                payment_plan_dict["active"] = line[88:123].strip()
-                payment_plan_dict["overdue_amount"] = line[123:].strip()
+                payment_plan_dict["payment_plan_nr"] = line[:41].strip()
+                payment_plan_dict["payment_plan_freq"] = line[41:74].strip()
+                payment_plan_dict["next_due_date"] = line[74:98].strip()
+                payment_plan_dict["active"] = line[98:133].strip()
+                payment_plan_dict["overdue_amount"] = line[133:].strip()
             else:
-                payment_plan_dict["participant"] = line[:88].strip()
-                payment_plan_dict["suspended"] = line[88:124].strip()
-                payment_plan_dict["next_due_amount"] = line[123:].strip()
+                payment_plan_dict["participant"] = line[:98].strip()
+                payment_plan_dict["suspended"] = line[98:133].strip()
+                payment_plan_dict["next_due_amount"] = line[133:].strip()
+                
         elif(payment_plan_history_block and "payment plan no" not in line and "responsible participant" not in line and "on these docket sheets" not in line and "assume any liability for inaccurate" not in line and "docket sheet information should" not in line and "who does not comply" not in line and "liability as set forth" not in line and "cpcms" not in line and "payment plan history:" not in line and line.strip() != ""):
             payment_nr += 1
             payment_idx = "payment_nr_" + str(payment_nr)
             payment_plan_dict[payment_idx] = {}
 
-            payment_plan_dict[payment_idx]["receipt_date"] = line[:33].strip()
-            payment_plan_dict[payment_idx]["payor_name"] = line[33:61].strip()
-            payment_plan_dict[payment_idx]["participant_role"] = line[61:83].strip()
-            payment_plan_dict[payment_idx]["amount_paid"] = line[83:].strip()
+            payment_plan_dict[payment_idx]["receipt_date"] = line[:82].strip()
+            payment_plan_dict[payment_idx]["payor_name"] = line[82:110].strip()
+            payment_plan_dict[payment_idx]["participant_role"] = line[110:132].strip()
+            payment_plan_dict[payment_idx]["amount_paid"] = line[132:].strip()
 
         i += 1
     
