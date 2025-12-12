@@ -32,8 +32,11 @@ def extract_sections(text: str) -> dict[str, str]:
 
     # Iterate through each match and find the starting character index as well as the section header.
     headers = [(match.start(), match.group().strip()) for match in matches]
-    # Drop any potential headers that are just empty whitespace.
-    headers = [h for h in headers if len(h[1]) > 0]
+    # Drop any potential headers that are just empty whitespace or are only 3 non-white space characters.
+    # We need to drop the 3 non-white space character headers because there are some acronyms that are all capital lettrs
+    # and are surrounded only by white space in the CASE FINANCIAL INFORMATION section. E.g., OAG and PSP.
+    # We also need to drop RRRI as a header. This can show as a punishment condition.
+    headers = [h for h in headers if len(h[1]) > 3 or h[1] == "RRRI"]
 
     # Dictionary to store sections
     sections = {}
@@ -239,6 +242,11 @@ def extract_charges(text:str) -> dict[str, str | list]:
     
     return(extracted_info)
 
+# Extracts the sentencing and disposition information from the DISPOSITION/SENTENCING section.
+# Args:
+#   text(str): The text containing the disposition and sentencing information.
+# Return:
+#   dict: A dictionary containing the extracted information.
 def extract_sentencing(text:str) -> dict[str, str | list]:
     split = text.split("\n")
     extracted_info = {}
@@ -247,7 +255,7 @@ def extract_sentencing(text:str) -> dict[str, str | list]:
     i = 0
 
     # Possible punishments.
-    punishments = "confinement|probation|ipp|ard|ard - dui|drug court"
+    punishments = "^confinement$|^probation$|^ipp$|^ard$|^ard\s*-\s*dui$|^drug court$"
 
     # Counters for specific elements of the dictionary.
     case_event_nr = -1
@@ -325,7 +333,7 @@ def extract_sentencing(text:str) -> dict[str, str | list]:
             extracted_info[case_event_idx][offense_idx][sentence_idx]["credit_for_time_served"] = line[100:].strip()
         # If you find hour, day, week, month or year and a date or a punishment from the list of punishments, this is the first line of the sentence length (5th element).
         # Unfortunately, not every punishment has a start date.
-        elif(re.search(r"hour|day|week|month|year", line) and (re.search(r"\d{2}/\d{2}/\d{4}", line) or re.search(punishments, line))):
+        elif(re.search(r"hour|day|week|month|year", line) and (re.search(r"\d{2}/\d{2}/\d{4}", line) or re.search(punishments, line[:60].strip()))):
             # Move the punishment counter up 1 and initialize the punishment dictionary.
             punish_nr += 1
             punish_idx = "punish_nr_" + str(punish_nr)
@@ -819,18 +827,18 @@ def extract_related_cases(text:str) -> dict[str, str | list]:
 
         if("related docket no" not in line and "reflected on these docket sheets" not in line and "assume any liability for inaccurate" not in line and "docket sheet information should" not in line and "who does not comply" not in line and "liability as set forth" not in line and "cpcms" not in line and line.strip() != ""):
             # If only the relation reason column has an entry and every other column is empty, then the reason column overflowed on to the next line.
-            if(line[114:].strip() != "" and line[:43].strip() == "" and line[43:89].strip() == "" and line[90:114].strip() == ""):
+            if(line[114:].strip() != "" and line[:43].strip() == "" and line[43:89].strip() == "" and line[89:114].strip() == ""):
                 related_cases_dict[related_case_idx]["relation_reason"] = related_cases_dict[related_case_idx]["relation_reason"] + " " + line.strip()
             # If the related court and relation reason columns are blank, it is a bold line categorizing the related cases together.
             # I do not really think we need this information.
-            elif(line[90:114].strip() != "" and line[114:].strip() != ""):
+            elif(line[89:114].strip() != "" and line[114:].strip() != ""):
                 related_case_nr += 1
                 related_case_idx = "related_case_nr_" + str(related_case_nr)
                 related_cases_dict[related_case_idx] = {}
 
                 related_cases_dict[related_case_idx]["related_docket_nr"] = line[:43].strip()
                 related_cases_dict[related_case_idx]["related_case_caption"] = line[43:89].strip()
-                related_cases_dict[related_case_idx]["related_court"] = line[90:114].strip()
+                related_cases_dict[related_case_idx]["related_court"] = line[89:114].strip()
                 related_cases_dict[related_case_idx]["relation_reason"] = line[114:].strip()
 
         i += 1
