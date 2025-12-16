@@ -784,7 +784,7 @@ def extract_case_financial_info(text:str) -> dict[str, str | list]:
     while(i < len(split)):
         line = split[i].lower()
 
-        if(re.search(r"costs\/fees$", line.strip())):
+        if(re.search(r"costs\/fees$|restitution$|fines$", line.strip())):
             case_financial_block = True
 
         header_line1 = "assessment" in line or "payments" in line or "adjustments" in line or "non monetary" in line or "balance" in line
