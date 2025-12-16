@@ -731,6 +731,7 @@ def extract_bail(text:str) -> dict[str, str | list]:
             # If the bail date is blank, the bail action overflowed onto the next line.
             if(line[38:65].strip() == ""):
                 bail_dict["bail_info"][bail_idx]["bail_action"] = bail_dict["bail_info"][bail_idx]["bail_action"] +  " " + line[:38].strip()
+                bail_dict["bail_info"][bail_idx]["bail_type"] = bail_dict["bail_info"][bail_idx]["bail_type"] + " " + line[65:88].strip()
             # Otherwise, continue collecting the surety information as normal.
             else:
                 # Initialize starting values.
