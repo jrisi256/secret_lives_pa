@@ -790,7 +790,7 @@ def extract_case_financial_info(text:str) -> dict[str, str | list]:
         header_line1 = "assessment" in line or "payments" in line or "adjustments" in line or "non monetary" in line or "balance" in line
         header_line2 = "defendant" in line and "payments" in line
 
-        if(not re.search(r"costs\/fees$", line.strip()) and case_financial_block and "reflected on these docket sheets" not in line and "assume any liability for inaccurate" not in line and "docket sheet information should" not in line and "who does not comply" not in line and "liability as set forth" not in line and "assessment is subrogated" not in line and "cpcms" not in line and line.strip() != "" and not header_line1 and not header_line2):
+        if(not re.search(r"costs\/fees$|restitution$|fines$", line.strip()) and case_financial_block and "reflected on these docket sheets" not in line and "assume any liability for inaccurate" not in line and "docket sheet information should" not in line and "who does not comply" not in line and "liability as set forth" not in line and "assessment is subrogated" not in line and "cpcms" not in line and line.strip() != "" and not header_line1 and not header_line2):
             # If the first part is not blank but every other part is blank, then the description overflowed onto the next line.
             if(line[:62].strip() != "" and line[62:83].strip() == "" and line[83:99].strip() == "" and line[99:116].strip() == "" and line[116:133].strip() == "" and line[133:].strip() == ""):
                 case_financial_dict[fee_idx]["description"] = case_financial_dict[fee_idx]["description"] + " " + line.strip()
