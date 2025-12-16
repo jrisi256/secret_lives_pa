@@ -36,7 +36,7 @@ def extract_sections(text: str) -> dict[str, str]:
     # We need to drop the 3 non-white space character headers because there are some acronyms that are all capital lettrs
     # and are surrounded only by white space in the CASE FINANCIAL INFORMATION section. E.g., OAG and PSP.
     # We also need to drop RRRI as a header. This can show as a punishment condition.
-    headers = [h for h in headers if len(h[1]) > 3 or h[1] == "RRRI"]
+    headers = [h for h in headers if len(h[1]) > 3 and h[1] != "RRRI"]
 
     # Dictionary to store sections
     sections = {}
