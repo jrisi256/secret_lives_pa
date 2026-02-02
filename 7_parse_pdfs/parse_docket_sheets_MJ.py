@@ -7,7 +7,7 @@ import logging
 import pdfplumber
 import pandas as pd
 from datetime import datetime
-from parse_docket_sheet_CP_functions import extract_all
+from parse_docket_sheet_MJ_functions import extract_all
 
 arguments = sys.argv
 
@@ -19,7 +19,7 @@ path_to_logs = "/home/joe/Documents/secret_lives_pa/output/pdf_sample/log_files/
 
 # Initialize file names.
 # Argument 1 is the path to the chunk list e.g., ~/secret_lives_pa/output/pdf_sample/pdf_chunk_lists/
-# Argument 2 is the chunk of PDFs you want parsed e.g., Montgomery_CP_cs.csv
+# Argument 2 is the chunk of PDFs you want parsed e.g., Montgomery_MJ_cs.csv
 pdfs_to_parse = arguments[1] + arguments[2]
 progress_file = path_to_progress_file + "progress-" + arguments[2]
 log_file = path_to_logs + "log_file_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + ".txt"
