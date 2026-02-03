@@ -518,7 +518,7 @@ def extract_docket_entry_information(text:str) -> dict[str, str | list]:
             extracted_info[docket_entry_idx]["applies_to"] = line[107:].strip()
 
         # If we do not find a date, but it is not the end of the document nor is it the header row or an empty row, then it is an overflow row.
-        elif("filed date" not in line and "applies to" not in line and "printed:" not in line and "recent entries made" not in line and "administrative office of penn" not in line and "docket sheet information should" not in line and "comply with the prov" not in line and "as set forth in" not in line and line.strip() != ""):
+        elif("filed date" not in line and "applies to" not in line and "printed:" not in line and "recent entries made" not in line and "administrative office of penn" not in line and "docket sheet information should" not in line and "comply with the prov" not in line and "as set forth in" not in line and "magisterial district judge" not in line and line.strip() != ""):
             extracted_info[docket_entry_idx]["filed_date"] = extracted_info[docket_entry_idx]["filed_date"] + " " + line[:22].strip()
             extracted_info[docket_entry_idx]["entry"] = extracted_info[docket_entry_idx]["entry"] + " " + line[22:68].strip()
             extracted_info[docket_entry_idx]["filer"] = extracted_info[docket_entry_idx]["filer"] + " " + line[68:107].strip()
