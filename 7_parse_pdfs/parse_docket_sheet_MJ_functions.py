@@ -405,9 +405,13 @@ def extract_disp_sent(text:str) -> dict[str, str | list]:
             disposition_block = False
             offense_block = False
 
-        # As long as we are not on a column header, a junk line, or the end of the page, we are in the disposition block.
+        # I am not certain this is the case, but once we hit the the condition text, the current penalty is over. And a new offense begins.
         if("condition text:" in line):
             extracted_info["condition_text"] = line.split("condition text:")[1].strip()
+            offense_block = True
+            disposition_block = False
+            penalty_block = False
+        # As long as we are not on a column header, a junk line, or the end of the page, we are in the disposition block.
         elif(disposition_block and "case disposition" not in line and line.strip() != "" and "reflected on these" not in line and "inaccurate or delayed" not in line and "docket sheet info" not in line and "not comply with" not in line and "liability as set" not in line and "printed:" not in line and "magisterial district judge" not in line):
             extracted_info["case_disposition"] = line[:69].strip()
             extracted_info["disposition_date"] = line[69:103].strip()
@@ -428,16 +432,21 @@ def extract_disp_sent(text:str) -> dict[str, str | list]:
                 extracted_info[offense_nr_idx]["description"] = extracted_info[offense_nr_idx]["description"] + " " + line.strip()
         # As long as we are not on a column header, a junk line, or the end of the page, we are in the offense block.
         elif(penalty_block and "penalty type" not in line and line.strip() != "" and "reflected on these" not in line and "inaccurate or delayed" not in line and "docket sheet info" not in line and "not comply with" not in line and "liability as set" not in line and "printed:" not in line and "magisterial district judge" not in line):
-            penalty_nr += 1
-            penalty_nr_idx = "penalty_nr_" + str(penalty_nr)
-            extracted_info[penalty_nr_idx] = {}
+            # If we find a date in the line, then it is not an overflow line.
+            if(re.search("\d{2}/\d{2}/\d{4}", line)):
+                penalty_nr += 1
+                penalty_nr_idx = "penalty_nr_" + str(penalty_nr)
+                extracted_info[penalty_nr_idx] = {}
 
-            extracted_info[penalty_nr_idx]["penalty_type"] = line[:41].strip()
-            extracted_info[penalty_nr_idx]["penalty_date"] = line[41:58].strip()
-            extracted_info[penalty_nr_idx]["program_type"] = line[58:83].strip()
-            extracted_info[penalty_nr_idx]["start_date"] = line[83:97].strip()
-            extracted_info[penalty_nr_idx]["end_date"] = line[97:111].strip()
-            extracted_info[penalty_nr_idx]["period"] = line[111:].strip()
+                extracted_info[penalty_nr_idx]["penalty_type"] = line[:41].strip()
+                extracted_info[penalty_nr_idx]["penalty_date"] = line[41:58].strip()
+                extracted_info[penalty_nr_idx]["program_type"] = line[58:83].strip()
+                extracted_info[penalty_nr_idx]["start_date"] = line[83:97].strip()
+                extracted_info[penalty_nr_idx]["end_date"] = line[97:111].strip()
+                extracted_info[penalty_nr_idx]["period"] = line[111:].strip()
+            # If there is no date, then it is an overflow line.
+            else:
+                extracted_info[penalty_nr_idx]["program_type"] = extracted_info[penalty_nr_idx]["program_type"] + " " + line.strip()
 
         i += 1
     
