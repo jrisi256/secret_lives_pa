@@ -36,9 +36,13 @@ def extract_sections(text: str) -> dict[str, str]:
     # We need to drop the 3 non-white space character headers because there are some acronyms that are all capital lettrs
     # and are surrounded only by white space in the CASE FINANCIAL INFORMATION section. E.g., OAG and PSP.
     # We also need to drop RRRI, CJES, and JCPS as headers. This can show as a punishment condition.
-    # We also need to drop ALCOHOL-MINORS as this can show up as a charge description on its own line (bookended by white space).
-    # I unfortunately cannot think of a better method for cleaning up the charges data.
-    headers = [h for h in headers if len(h[1]) > 3 and h[1] != "RRRI" and h[1] != "CJES" and h[1] != "JCPS" and h[1] != "ALCOHOL-MINORS"]
+    headers = [h for h in headers if len(h[1]) > 3 and h[1] != "RRRI" and h[1] != "CJES" and h[1] != "JCPS"]
+
+    standard_headers = [
+        "DEFENDANT INFORMATION", "CASE INFORMATION", "STATUS INFORMATION", "CALENDAR EVENTS", "CASE PARTICIPANTS", "CHARGES",
+        "DISPOSITION / SENTENCING DETAILS", "ATTORNEY INFORMATION", "DOCKET ENTRY INFORMATION", "BAIL", "CONFINEMENT",
+        "CASE FINANCIAL INFORMATION", "PAYMENT PLAN SUMMARY", "DOCKET"
+    ]
 
     # Dictionary to store sections
     sections = {}
@@ -54,8 +58,14 @@ def extract_sections(text: str) -> dict[str, str]:
         # Extract section text.
         section_text = text[start_index:end_index].strip()
 
-        # Remove the header from the section text.
-        section_text = section_text[len(header):].strip()
+        # Sometimes, the description for a charge in CHARGES will be all capitalized, and it will take up multiple lines.
+        # Meaning to the parser, it looks like a new section header. We need to fix that.
+        # If the header is not in our standard list of headers AND the prior header is CHARGES, then the header is not really a header.
+        if(header not in standard_headers and headers[i - 1][1] == "CHARGES"):
+            header = "CHARGES"
+        else:
+            # Remove the header from the section text.
+            section_text = section_text[len(header):].strip()
 
         # The BAIL section header does not carry over to new pages. To capture the info which overflows onto the next page, set the DOCKET header to the previous substantive header (i.e., BAIL).
         # And then remove the junk from the top of the docket header.
