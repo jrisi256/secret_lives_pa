@@ -752,7 +752,7 @@ def extract_case_financial_info(text:str) -> dict[str, str | list]:
 
         if("case balance:" in line and "next payment amt:" in line):
             case_financial_dict["case_balance"] = line.split("case balance:")[1].split("next payment amt:")[0].strip()
-            case_financial_dict["next payment amt"] = line.split("next payment amt")[1].strip()
+            case_financial_dict["next payment amt"] = line.split("next payment amt:")[1].strip()
         elif("last payment amt:" in line and "next payment due date:" in line):
             case_financial_dict["last_payment_amt"] = line.split("last payment amt:")[1].split("next payment due date:")[0].strip()
             case_financial_dict["next_payment_due_date"] = line.split("next payment due date:")[1].strip()
