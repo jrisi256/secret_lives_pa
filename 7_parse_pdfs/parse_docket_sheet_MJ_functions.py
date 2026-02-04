@@ -125,11 +125,13 @@ def extract_defendant_information(text: str) -> dict[str, str | list]:
         elif("address(es):" in line):
             if("advised of his right to apply for assignment of counsel?" in split[i + 1].lower()):
                 extracted_info["address_type"] = ""
+                extracted_info["counsel"] = split[i + 1].lower().split("advised of his right to apply for assignment of counsel?")[1].strip()
             else:
                 extracted_info["address_type"] = split[i + 1].split()
 
             if("public defender requested by the defendant?" in split[i + 2].lower()):
                 extracted_info["address"] = ""
+                extracted_info["defender_requested"] = split[i + 2].lower().split("public defender requested by the defendant?")[1].strip()
             else:
                 extracted_info["address"] = re.split("\s{2,}", split[i + 2].strip().lower())
             i += 3
