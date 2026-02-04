@@ -95,7 +95,6 @@ def extract_sections(text: str) -> dict[str, str]:
 #   text (str): The text containing the defendant's information.
 # Return:
 #   dict: A dictionary containing the extracted information.
-
 def extract_defendant_information(text: str) -> dict[str, str | list]:
     split = text.split("\n")
     split = [line for line in split if line.strip() != ""]
@@ -114,6 +113,7 @@ def extract_defendant_information(text: str) -> dict[str, str | list]:
     #   Line 9 is if the defendant has been finger printed.
     while(i < len(split)):
         line = split[i].lower().strip()
+
         if("name:" in line or "sex:" in line):
             extracted_info["name"] = line.split("name:")[1].split("sex:")[0].strip()
             extracted_info["sex"] = line.split("name:")[1].split("sex:")[1].strip()
@@ -123,9 +123,15 @@ def extract_defendant_information(text: str) -> dict[str, str | list]:
             extracted_info["race"] = line.split("date of birth:")[1].split("race:")[1].strip()
             i += 1
         elif("address(es):" in line):
-            extracted_info["address_type"] = split[i + 1].split()
-            extracted_info["address"] = re.split("\s{2,}", split[i + 2].strip())
-            #extracted_info["address"] = re.findall(r"([A-Za-z]+\s*,\s*[A-Za-z]{2}\s*[0-9]{5})", split[i + 2])
+            if("advised of his right to apply for assignment of counsel?" in split[i + 1].lower()):
+                extracted_info["address_type"] = ""
+            else:
+                extracted_info["address_type"] = split[i + 1].split()
+
+            if("public defender requested by the defendant?" in split[i + 2].lower()):
+                extracted_info["address"] = ""
+            else:
+                extracted_info["address"] = re.split("\s{2,}", split[i + 2].strip().lower())
             i += 3
         elif("advised of his right to apply for assignment of counsel?" in line):
             extracted_info["counsel"] = line.split("advised of his right to apply for assignment of counsel?")[1].strip()
