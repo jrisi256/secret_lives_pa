@@ -98,6 +98,7 @@ def extract_sections(text: str) -> dict[str, str]:
 
 def extract_defendant_information(text: str) -> dict[str, str | list]:
     split = text.split("\n")
+    split = [line for line in split if line.strip() != ""]
     extracted_info = {}
     i = 0
 
@@ -367,30 +368,68 @@ def extract_charges(text:str) -> dict[str, str | list]:
 def extract_disp_sent(text:str) -> dict[str, str | list]:
     split = text.split("\n")
     extracted_info = {}
+    i = 0
+    disposition_block = False
+    offense_block = False
+    penalty_block = False
+
+    # Offense block.
     offense_nr = -1
     offense_nr_idx = "offense_nr_" + str(offense_nr)
-    i = 0
+    
+    # Penalty block.
+    penalty_nr = -1
+    penalty_nr_idx = "penalty_nr_" + str(penalty_nr)
 
     while(i < len(split)):
         line = split[i].lower()
 
-        # If we find a date, this line contains the disposition, the disposition date, and if the defendant was present.
-        if(re.search(r"\d{2}/\d{2}/\d{4}", line) and "printed:" not in line):
+        if("case disposition" in line):
+            disposition_block = True
+            offense_block = False
+            penalty_block = False
+        elif("offense disposition" in line):
+            offense_block = True
+            disposition_block = False
+            penalty_block = False
+        elif("penalty type" in line):
+            penalty_block = True
+            disposition_block = False
+            offense_block = False
+
+        # As long as we are not on a column header, a junk line, or the end of the page, we are in the disposition block.
+        if("condition text:" in line):
+            extracted_info["condition_text"] = line.split("condition text:")[1].strip()
+        elif(disposition_block and "case disposition" not in line and line.strip() != "" and "reflected on these" not in line and "inaccurate or delayed" not in line and "docket sheet info" not in line and "not comply with" not in line and "liability as set" not in line and "printed:" not in line and "magisterial district judge" not in line):
             extracted_info["case_disposition"] = line[:69].strip()
             extracted_info["disposition_date"] = line[69:103].strip()
             extracted_info["defendant_present"] = line[103:].strip()
-        # As long as we are not on a column header, a junk line, or the end of page AND there is at least one number, then we are on a new offense.
-        elif("case disposition" not in line and "offense disposition" not in line and line.strip() != "" and "reflected on these docket sheets" not in line and "inaccurate or delayed data" not in line and "docket sheet information should" not in line and "not comply with the" not in line and "liability as set forth" not in line and "printed:" not in line and "magisterial district judge" not in line and re.search("[0-9]+", line)):
-            offense_nr += 1
-            offense_nr_idx = "offense_nr_" + str(offense_nr)
-            extracted_info[offense_nr_idx] = {}
+        # As long as we are not on a column header, a junk line, or the end of the page, we are in the offense block.
+        elif(offense_block and "offense disposition" not in line and line.strip() != "" and "reflected on these" not in line and "inaccurate or delayed" not in line and "docket sheet info" not in line and "not comply with" not in line and "liability as set" not in line and "printed:" not in line and "magisterial district judge" not in line):
+            # If we find a number, that is the offense sequence number. It is a new offense.
+            if(re.search("[0-9]+", line)):
+                offense_nr += 1
+                offense_nr_idx = "offense_nr_" + str(offense_nr)
+                extracted_info[offense_nr_idx] = {}
 
-            extracted_info[offense_nr_idx]["offense_seq"] = line[:14].strip()
-            extracted_info[offense_nr_idx]["description"] = line[14:80].strip()
-            extracted_info[offense_nr_idx]["offense_disposition"] = line[80:].strip()
-        # However, if there is no number, then it is a continuation of the previous line.
-        elif("case disposition" not in line and "offense disposition" not in line and line.strip() != "" and "reflected on these docket sheets" not in line and "inaccurate or delayed data" not in line and "docket sheet information should" not in line and "not comply with the" not in line and "liability as set forth" not in line and "printed:" not in line and "magisterial district judge" not in line and not re.search("[0-9]+", line)):
-            extracted_info[offense_nr_idx]["description"] = extracted_info[offense_nr_idx]["description"] + " " + line.strip()
+                extracted_info[offense_nr_idx]["offense_seq"] = line[:14].strip()
+                extracted_info[offense_nr_idx]["description"] = line[14:80].strip()
+                extracted_info[offense_nr_idx]["offense_disposition"] = line[80:].strip()
+            # If we do not find a number, but we are still in the offense block, the description must have overflowed onto a new line.
+            else:
+                extracted_info[offense_nr_idx]["description"] = extracted_info[offense_nr_idx]["description"] + " " + line.strip()
+        # As long as we are not on a column header, a junk line, or the end of the page, we are in the offense block.
+        elif(penalty_block and "penalty type" not in line and line.strip() != "" and "reflected on these" not in line and "inaccurate or delayed" not in line and "docket sheet info" not in line and "not comply with" not in line and "liability as set" not in line and "printed:" not in line and "magisterial district judge" not in line):
+            penalty_nr += 1
+            penalty_nr_idx = "penalty_nr_" + str(penalty_nr)
+            extracted_info[penalty_nr_idx] = {}
+
+            extracted_info[penalty_nr_idx]["penalty_type"] = line[:41].strip()
+            extracted_info[penalty_nr_idx]["penalty_date"] = line[41:58].strip()
+            extracted_info[penalty_nr_idx]["program_type"] = line[58:83].strip()
+            extracted_info[penalty_nr_idx]["start_date"] = line[83:97].strip()
+            extracted_info[penalty_nr_idx]["end_date"] = line[97:111].strip()
+            extracted_info[penalty_nr_idx]["period"] = line[111:].strip()
 
         i += 1
     
