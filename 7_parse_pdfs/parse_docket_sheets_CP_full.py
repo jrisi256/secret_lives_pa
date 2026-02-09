@@ -7,22 +7,25 @@ import logging
 import pdfplumber
 import pandas as pd
 from datetime import datetime
-from parse_docket_sheet_MJ_functions import extract_all
+from parse_docket_sheet_CP_functions import extract_all
 
 arguments = sys.argv
 
-# Initialize paths.
-path_to_progress_file = "/home/joe/Documents/secret_lives_pa/output/pdf_sample/progress_files/"
-path_to_pdfs = "/home/joe/Documents/secret_lives_pa/output/pdf_sample/pdfs/"
-path_to_json = "/home/joe/Documents/secret_lives_pa/output/pdf_sample/json/"
-path_to_logs = "/home/joe/Documents/secret_lives_pa/output/pdf_sample/log_files/"
+# Initialize paths and file names.
+# Argument 1 is the root path of our files e.g., ~/secret_lives_pa/output/pdf_parse_list/ or /media/joe/T7 Shield/
+# Argument 2 is the chunk of PDFs you want parsed e.g., Montgomery_CP_ds.csv
+path_to_progress_file = arguments[1] + "progress_files/"
+path_to_json = arguments[1] + "json/"
+path_to_logs = arguments[1] + "log_files/"
+os.makedirs(path_to_progress_file, exist_ok = True)
+os.makedirs(path_to_json, exist_ok = True)
+os.makedirs(path_to_logs, exist_ok = True)
 
-# Initialize file names.
-# Argument 1 is the path to the chunk list e.g., ~/secret_lives_pa/output/pdf_parse_list/pdf_chunk_lists/
-# Argument 2 is the chunk of PDFs you want parsed e.g., Montgomery_MJ_cs.csv
+target_county = arguments[2].split("_")[0]
+path_to_pdfs = arguments[1] + "pdfs/" + target_county + "/"
 pdfs_to_parse = arguments[1] + arguments[2]
 progress_file = path_to_progress_file + "progress-" + arguments[2]
-log_file = path_to_logs + "log_file_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + ".txt"
+log_file = path_to_logs + "log_file_" + arguments[2].removesuffix(".csv") + "_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + ".txt"
 
 # Configure the logger.
 logging.basicConfig(filename = log_file, level = logging.INFO, filemode = "w+")

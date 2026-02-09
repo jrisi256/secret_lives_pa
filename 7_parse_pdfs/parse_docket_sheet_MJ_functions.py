@@ -47,6 +47,9 @@ def extract_sections(text: str) -> dict[str, str]:
     # Dictionary to store sections
     sections = {}
 
+    # Way to track previous header.
+    prior_header = ""
+
     # Iterate over headers and extract sections.
     for i in range(len(headers)):
         start_index = headers[i][0]
@@ -61,15 +64,15 @@ def extract_sections(text: str) -> dict[str, str]:
         # Sometimes, the description for a charge in CHARGES will be all capitalized, and it will take up multiple lines.
         # Meaning to the parser, it looks like a new section header. We need to fix that.
         # If the header is not in our standard list of headers AND the prior header is CHARGES, then the header is not really a header.
-        if(header not in standard_headers and headers[i - 1][1] == "CHARGES"):
+        if(header not in standard_headers and prior_header == "CHARGES"):
             header = "CHARGES"
         else:
             # Remove the header from the section text.
             section_text = section_text[len(header):].strip()
 
-        # The BAIL section header does not carry over to new pages. To capture the info which overflows onto the next page, set the DOCKET header to the previous substantive header (i.e., BAIL).
-        # And then remove the junk from the top of the docket header.
-        if re.search("^DOCKET$", header) and "BAIL" in headers[i - 1][1] and i - 2 > 0:
+        # The BAIL and CALENDAR EVENTS section headers does not carry over to new pages
+        # To capture the info which overflows onto the next page, set the DOCKET header to the previous header (i.e., BAIL or CALENDAR EVENTS). Then remove the junk from the top of the docket.
+        if re.search("^DOCKET$", header) and ("BAIL" in headers[i - 1][1] or "CALENDAR EVENTS" in headers[i - 1][1]) and i - 2 > 0:
             header = headers[i - 1][1]
             section_text_list = [line for line in section_text.split("\n") if line.strip() != ""]
             section_text = "\n".join(section_text_list[5:])
@@ -79,6 +82,7 @@ def extract_sections(text: str) -> dict[str, str]:
             header = "ATTORNEY INFORMATION"
         elif "BAIL INFORMATION" in header:
             header = "BAIL"
+        prior_header = header
             
         # Add the current section header to our dictionary of sections.
         # setdefault searches for the key in your dictionary if it exists.
@@ -287,7 +291,7 @@ def extract_calendar_events(text:str) -> dict[str, str | list]:
             extracted_info[event_idx]["schedule_status"] = line[127:].strip()
 
         # If we do not find a date, but it is not the end of the document nor is it the header row or an empty row, then it is an overflow row.
-        elif("case calendar" not in line and "event type" not in line and "printed:" not in line and "recent entries" not in line and "administrative" not in line and "docket sheet" not in line and "comply" not in line and "set forth" not in line and line.strip() != ""):
+        elif("case calendar" not in line and "event type" not in line and "printed:" not in line and "recent entries" not in line and "administrative" not in line and "docket sheet" not in line and "comply" not in line and "set forth" not in line and not re.search("magisterial\s*district\s*judge [0-9]{2}-", line) and line.strip() != ""):
             extracted_info[event_idx]["event_type"] = extracted_info[event_idx]["event_type"] + " " + line[:37].strip()
             extracted_info[event_idx]["start_date"] = extracted_info[event_idx]["start_date"] + " " + line[37:49].strip()
             extracted_info[event_idx]["start_time"] = extracted_info[event_idx]["start_time"] + " " + line[49:65].strip()
