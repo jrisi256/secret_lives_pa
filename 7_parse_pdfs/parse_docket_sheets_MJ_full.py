@@ -13,7 +13,7 @@ arguments = sys.argv
 
 # Initialize paths and file names.
 # Argument 1 is the root path of our files e.g., ~/secret_lives_pa/output/pdf_parse_list/ or /media/joe/T7 Shield/
-# Argument 2 is the chunk of PDFs you want parsed e.g., Montgomery_CP_ds.csv
+# Argument 2 is the chunk of PDFs you want parsed e.g., Montgomery_ds_MJ_CR_chunkList.csv
 path_to_progress_file = arguments[1] + "progress_files/"
 path_to_json = arguments[1] + "json/"
 path_to_logs = arguments[1] + "log_files/"
@@ -23,7 +23,7 @@ os.makedirs(path_to_logs, exist_ok = True)
 
 target_county = arguments[2].split("_")[0]
 path_to_pdfs = arguments[1] + "pdfs/" + target_county + "/"
-pdfs_to_parse = arguments[1] + arguments[2]
+pdfs_to_parse = arguments[1] + "pdf_chunk_lists/" + arguments[2]
 progress_file = path_to_progress_file + "progress-" + arguments[2]
 log_file = path_to_logs + "log_file_" + arguments[2].removesuffix(".csv") + "_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + ".txt"
 

@@ -12,7 +12,7 @@ arguments = sys.argv
 
 # Initialize paths and file names.
 # Argument 1 is the root path of our files e.g., ~/secret_lives_pa/output/pdf_parse_list/ or /media/joe/T7 Shield/
-# Argument 2 is the chunk of PDFs you want parsed e.g., Montgomery_CP_cs.csv
+# Argument 2 is the chunk of PDFs you want parsed e.g., Montgomery_cs_CP_CR_chunkList.csv
 path_to_progress_file = arguments[1] + "progress_files/"
 path_to_json = arguments[1] + "json/"
 path_to_logs = arguments[1] + "log_files/"
@@ -22,7 +22,7 @@ os.makedirs(path_to_logs, exist_ok = True)
 
 target_county = arguments[2].split("_")[0]
 path_to_pdfs = arguments[1] + "pdfs/" + target_county + "/"
-pdfs_to_parse = arguments[1] + arguments[2]
+pdfs_to_parse = arguments[1] + "pdf_chunk_lists/" + arguments[2]
 progress_file = path_to_progress_file + "progress-" + arguments[2]
 log_file = path_to_logs + "log_file_" + arguments[2].removesuffix(".csv") + "_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + ".txt"
 
@@ -51,7 +51,19 @@ def extract_poi(lines_arg):
 
     # Beginning part of every court summary in court of common pleas has a block of text with person information.
     poi_start_index = [i for i, x in enumerate(lines_arg) if "DOB:" in x][0]
-    poi_end_index = [i for i,x in enumerate(lines_arg) if "closed" in x.lower() or "inactive" in x.lower() or "active" in x.lower() or "adjudicated" in x.lower()][0]
+
+    # If there are no closed, inactive, active, or adjudicated cases, this individual has no case history.
+    no_cases = True
+    for i, x in enumerate(lines):
+        if("closed" in x.lower() or "inactive" in x.lower() or "active" in x.lower() or "adjudicated" in x.lower()):
+            no_cases = False
+            break
+
+    if(no_cases):
+        poi_end_index = len(lines) - 1
+    else:
+        poi_end_index = [i for i,x in enumerate(lines) if "closed" in x.lower() or "inactive" in x.lower() or "active" in x.lower() or "adjudicated" in x.lower()][0]
+
     poi = lines_arg[poi_start_index:poi_end_index]
 
     # Name, DOB, and Sex appear on the first line.
@@ -385,6 +397,8 @@ for row in pdf_parse_table_df.itertuples():
                     break
 
             cs_dict[case_status], new_line_index = result_tuple
+        else:
+            new_line_index = current_line_index + 1
         
         current_line_index = new_line_index
 

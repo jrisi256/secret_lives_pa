@@ -48,7 +48,19 @@ def extract_poi(lines_arg):
 
     # Beginning part of every court summary in court of common pleas has a block of text with person information.
     poi_start_index = [i for i, x in enumerate(lines_arg) if "DOB:" in x][0]
-    poi_end_index = [i for i,x in enumerate(lines_arg) if "closed" in x.lower() or "inactive" in x.lower() or "active" in x.lower() or "adjudicated" in x.lower()][0]
+
+    # If there are no closed, inactive, active, or adjudicated cases, this individual has no case history.
+    no_cases = True
+    for i, x in enumerate(lines):
+        if("closed" in x.lower() or "inactive" in x.lower() or "active" in x.lower() or "adjudicated" in x.lower()):
+            no_cases = False
+            break
+
+    if(no_cases):
+        poi_end_index = len(lines) - 1
+    else:
+        poi_end_index = [i for i,x in enumerate(lines) if "closed" in x.lower() or "inactive" in x.lower() or "active" in x.lower() or "adjudicated" in x.lower()][0]
+
     poi = lines_arg[poi_start_index:poi_end_index]
 
     # Name, DOB, and Sex appear on the first line.
@@ -382,6 +394,8 @@ for row in pdf_parse_table_df.itertuples():
                     break
 
             cs_dict[case_status], new_line_index = result_tuple
+        else:
+            new_line_index = current_line_index + 1
         
         current_line_index = new_line_index
 
