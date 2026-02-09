@@ -243,7 +243,7 @@ def extract_inactive_active_cases(ia_idx, ia_lines):
             continue
 
         # If the current line has a case status, we have finished all active/inactive/adjudicated cases.
-        if((("closed" == cur_ia_line or "inactive" == cur_ia_line or "active" == cur_ia_line or "adjudicated" in cur_ia_line) and "continued" not in cur_ia_line)):
+        if((("closed" == cur_ia_line or "inactive" == cur_ia_line or "active" == cur_ia_line or "adjudicated" == cur_ia_line) and "continued" not in cur_ia_line)):
             loop_through_ia_cases = False
         # Check if the current line is a new county.
         elif(cur_ia_line in counties):
@@ -395,7 +395,7 @@ for row in pdf_parse_table_df.itertuples():
                     progress_row = pd.DataFrame([{"file_name": row.file_name, "successfully_parsed": False, "time_stamp": timestamp}])
                     progress_row.to_csv(progress_file, index = False, mode = "a", header = False)
                     break
-
+            
             cs_dict[case_status], new_line_index = result_tuple
         else:
             new_line_index = current_line_index + 1

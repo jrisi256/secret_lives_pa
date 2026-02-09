@@ -240,7 +240,7 @@ def extract_inactive_active_cases(ia_idx, ia_lines):
             continue
 
         # If the current line has a case status, we have finished all active/inactive/adjudicated cases.
-        if((("closed" == cur_ia_line or "inactive" == cur_ia_line or "active" == cur_ia_line or "adjudicated" in cur_ia_line) and "continued" not in cur_ia_line)):
+        if((("closed" == cur_ia_line or "inactive" == cur_ia_line or "active" == cur_ia_line or "adjudicated" == cur_ia_line) and "continued" not in cur_ia_line)):
             loop_through_ia_cases = False
         # Check if the current line is a new county.
         elif(cur_ia_line in counties):
