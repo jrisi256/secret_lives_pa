@@ -66,6 +66,9 @@ def extract_sections(text: str) -> dict[str, str]:
         # If the header is not in our standard list of headers AND the prior header is CHARGES, then the header is not really a header.
         if(header not in standard_headers and prior_header == "CHARGES"):
             header = "CHARGES"
+        # Similar thing happens for ATTORNEY INFORMATION and attorney addresses (sometimes the address is capitalized).
+        elif(header not in standard_headers and prior_header == "ATTORNEY INFORMATION"):
+            header = "ATTORNEY INFORMATION"
         else:
             # Remove the header from the section text.
             section_text = section_text[len(header):].strip()
@@ -201,9 +204,13 @@ def extract_case_information(text: str) -> dict[str, str | list]:
                 extracted_info["otn_lotn"] = line.split("otn/lotn:")[1].split("file date:")[0].strip()
                 extracted_info["file_date"] = line.split("otn/lotn:")[1].split("file date:")[1].strip()
             i += 1
-        elif("arresting agency:" in line or "arrest date:" in line):
-            extracted_info["arresting_agency"] = line.split("arresting agency:")[1].split("arrest date:")[0].strip()
-            extracted_info["arrest_date"] = line.split("arresting agency:")[1].split("arrest date:")[1].strip()
+        # Not every PDF has an arrest date. See ds_Blair_MJ_24301_CR_0000008_2022.
+        elif("arresting agency:" in line):
+            if("arrest date:" in line):
+                extracted_info["arresting_agency"] = line.split("arresting agency:")[1].split("arrest date:")[0].strip()
+                extracted_info["arrest_date"] = line.split("arresting agency:")[1].split("arrest date:")[1].strip()
+            else:
+                extracted_info["arresting_agency"] = line.split("arresting agency:")[1].strip()
             i += 1
         elif("complaint no.:" in line or "incident no.:" in line):
             if("complaint no.:" in line):
@@ -351,8 +358,8 @@ def extract_charges(text:str) -> dict[str, str | list]:
         # Skip blank lines, column header line, and junk lines.
         if("offense dt." in line or line.strip() == "" or "reflected on these docket sheets" in line or "inaccurate or delayed data" in line or "docket sheet information should" in line or "not comply with the" in line or "liability as set forth" in line or "printed:" in line or "magisterial district judge" in line):
             i += 1
-        # The § character indicates a new charge.
-        elif("§" in line):
+        # The § character indicates a new charge. However, not every charge has §. See ds_Blair_MJ_24103_CR_0000021_2011.
+        elif("§" in line or "unspecified object crime" in line):
             charge_nr += 1
             charge_nr_idx = "charge_nr_" + str(charge_nr)
             extracted_info[charge_nr_idx] = {}
@@ -432,8 +439,19 @@ def extract_disp_sent(text:str) -> dict[str, str | list]:
                 extracted_info[offense_nr_idx]["description"] = line[14:80].strip()
                 extracted_info[offense_nr_idx]["offense_disposition"] = line[80:].strip()
             # If we do not find a number, but we are still in the offense block, the description must have overflowed onto a new line.
+            # It can also happen that there is no offense sequence number and description. See ds_Montgomery_MJ_38119_CR_0000581_2010.pdf.
+            # In which case, we need to properly indicate this is a new offense.
             else:
-                extracted_info[offense_nr_idx]["description"] = extracted_info[offense_nr_idx]["description"] + " " + line.strip()
+                if(offense_nr == -1):
+                    offense_nr += 1
+                    offense_nr_idx = "offense_nr_" + str(offense_nr)
+                    extracted_info[offense_nr_idx] = {}
+
+                    extracted_info[offense_nr_idx]["offense_seq"] = line[:14].strip()
+                    extracted_info[offense_nr_idx]["description"] = line[14:80].strip()
+                    extracted_info[offense_nr_idx]["offense_disposition"] = line[80:].strip()
+                else:
+                    extracted_info[offense_nr_idx]["description"] = extracted_info[offense_nr_idx]["description"] + " " + line.strip()
         # As long as we are not on a column header, a junk line, or the end of the page, we are in the offense block.
         elif(penalty_block and "penalty type" not in line and line.strip() != "" and "reflected on these" not in line and "inaccurate or delayed" not in line and "docket sheet info" not in line and "not comply with" not in line and "liability as set" not in line and "printed:" not in line and "magisterial district judge" not in line):
             # If we find a date in the line, then it is not an overflow line.
@@ -472,6 +490,8 @@ def extract_attorney_info(text:str) -> dict[str, str | list]:
     lefthand_lines_clean = [line for line in lefthand_lines if line.strip() != ""]
     righthand_lines = [line[69:].strip().lower() for line in split]
     righthand_lines_clean = [line for line in righthand_lines if line.strip() != ""]
+    for line in righthand_lines_clean:
+        print(line)
     
     # Indices for the lawyers.
     lawyer_nr = -1
@@ -496,7 +516,13 @@ def extract_attorney_info(text:str) -> dict[str, str | list]:
             extracted_info[lawyer_idx]["representing"] = l_line.split("representing:")[1].strip()
         elif("counsel status:" in l_line):
             extracted_info[lawyer_idx]["counsel_status"] = l_line.split("counsel status:")[1].strip()
+        # Some strange situations where supreme court number comes before name. See ds_Centre_MJ_49305_CR_0000147_2020.
         elif("supreme court no.:" in l_line):
+            if(lawyer_idx == "lawyer_nr_-1"):
+                # New lawyer.
+                lawyer_nr += 1
+                lawyer_idx = "lawyer_nr_" + str(lawyer_nr)
+                extracted_info[lawyer_idx] = {}
             extracted_info[lawyer_idx]["supreme_court_nr"] = l_line.split("supreme court no.:")[1].strip()
         # Some strange situations where phone number comes before name. See ds_Blair_MJ_24102_CR_0000701_2010.
         elif("phone no.:" in l_line):
@@ -505,20 +531,30 @@ def extract_attorney_info(text:str) -> dict[str, str | list]:
                 lawyer_nr += 1
                 lawyer_idx = "lawyer_nr_" + str(lawyer_nr)
                 extracted_info[lawyer_idx] = {}
-
             extracted_info[lawyer_idx]["phone_nr"] = l_line.split("phone no.:")[1].strip()
+        # Some strange situations where address comes before name. See ds_Erie_MJ_06202_CR_0000377_2011.pdf.
         elif("address:" in l_line):
+            if(lawyer_idx == "lawyer_nr_-1"):
+                # New lawyer.
+                lawyer_nr += 1
+                lawyer_idx = "lawyer_nr_" + str(lawyer_nr)
+                extracted_info[lawyer_idx] = {}
+                
             extracted_info[lawyer_idx]["address"] = l_line.split("address:")[1].strip()
 
             # As long as the lawyer has an address, enter the address block.
             if(extracted_info[lawyer_idx]["address"] != ""):
                 address_block = True
         # As long as we are not at the end of the page or on a blank line AND we are in the address block, collect the data and add it to the address.
-        elif(l_line != "" and "reflected on these docket sheets" not in l_line and "inaccurate or delayed data" not in l_line and "docket sheet information should" not in l_line and "not comply with the" not in l_line and "liability as set forth" not in l_line and "printed:" not in l_line and "magisterial district judge" not in l_line and address_block):
+        elif(l_line != "" and "recent entries made" not in l_line and "nor the administrative" not in l_line and "docket sheet information" not in l_line and "do not comply" not in l_line and "may be subject to" not in l_line and "mdjs" not in l_line and "magisterial district judge" not in l_line and address_block):
+            print(l_line)
             extracted_info[lawyer_idx]["address"] = extracted_info[lawyer_idx]["address"] + "|" + l_line
 
             # If we find a the city + state + zip code, then the address is over.
             if(re.search("[A-Za-z]+,\s*[A-Za-z]{2}\s*[0-9]{5}", l_line)):
+                address_block = False
+            # In some cases, they'll just have the state.
+            elif(re.search(",\s*[a-z]{2}", l_line)):
                 address_block = False
 
         i += 1
@@ -550,7 +586,7 @@ def extract_attorney_info(text:str) -> dict[str, str | list]:
             if(extracted_info[lawyer_idx]["address"] != ""):
                 address_block = True
         # As long as we are not at the end of the page or on a blank line AND we are in the address block, collect the data and add it to the address.
-        elif(r_line != "" and "reflected on these docket sheets" not in r_line and "inaccurate or delayed data" not in r_line and "docket sheet information should" not in r_line and "not comply with the" not in r_line and "liability as set forth" not in r_line and "printed:" not in r_line and "magisterial district judge" not in r_line and address_block):
+        elif(r_line != "" and "reflected on these" not in r_line and "inaccurate or delayed" not in r_line and "criminal history background" not in r_line and "provisions of the criminal" not in r_line and "liability as set forth" not in r_line and "printed:" not in r_line and "magisterial district judge" not in r_line and address_block):
             extracted_info[lawyer_idx]["address"] = extracted_info[lawyer_idx]["address"] + "|" + r_line
 
             # If we find a the city + state + zip code, then the address is over.

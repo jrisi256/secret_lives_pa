@@ -39,7 +39,7 @@ counties = [
             "huntingdon", "indiana", "jefferson", "juniata", "lackawanna",
             "lancaster", "lawrence", "lebanon", "lehigh", "luzerne", "lycoming",
             "mckean", "mercer", "mifflin", "monroe", "montgomery", "montour",
-            "northampton", "northumberla", "perry", "philadelphia", "pike",
+            "northampton", "northumberland", "perry", "philadelphia", "pike",
             "potter", "schuylkill", "snyder", "somerset", "sullivan",
             "susquehanna", "tioga", "union", "venango", "warren", "washington",
             "wayne", "westmoreland", "wyoming", "york"
@@ -49,44 +49,54 @@ counties = [
 def extract_poi(lines_arg):
     poi_dict = {}
 
-    # Beginning part of every court summary in court of common pleas has a block of text with person information.
-    poi_start_index = [i for i, x in enumerate(lines_arg) if "DOB:" in x][0]
+    # If there is no DOB, then this person has no PII.
+    no_poi = True
+    for i, x in enumerate(lines):
+        if("DOB:" in x):
+            no_poi = False
+            break
+
+    if(no_poi):
+        poi_start_index = 0
+    else:
+        poi_start_index = [i for i, x in enumerate(lines) if "DOB:" in x][0]
 
     # If there are no closed, inactive, active, or adjudicated cases, this individual has no case history.
     no_cases = True
     for i, x in enumerate(lines):
-        if("closed" in x.lower() or "inactive" in x.lower() or "active" in x.lower() or "adjudicated" in x.lower()):
+        if("closed" in x.lower() or "inactive" in x.lower() or "active" in x.lower() or "adjudicated" in x.lower() or "adjudicated/closed" in x.lower() or "physical case file destroyed" in x.lower()):
             no_cases = False
             break
 
     if(no_cases):
         poi_end_index = len(lines) - 1
     else:
-        poi_end_index = [i for i,x in enumerate(lines) if "closed" in x.lower() or "inactive" in x.lower() or "active" in x.lower() or "adjudicated" in x.lower()][0]
+        poi_end_index = [i for i,x in enumerate(lines) if "adjudicated/closed" in x.lower() or "physical case file destroyed" in x.lower() or "closed" in x.lower() or "inactive" in x.lower() or "active" in x.lower() or "adjudicated" in x.lower()][0]
 
     poi = lines_arg[poi_start_index:poi_end_index]
 
-    # Name, DOB, and Sex appear on the first line.
-    poi_dict["name"] = poi[0].split("DOB:")[0].strip()
-    poi_dict["dob"] = poi[0].split("DOB:")[1].split("Sex:")[0].strip()
-    poi_dict["sex"] = poi[0].split("DOB:")[1].split("Sex:")[1].strip()
+    if(not no_poi):
+        # Name, DOB, and Sex appear on the first line.
+        poi_dict["name"] = poi[0].split("DOB:")[0].strip()
+        poi_dict["dob"] = poi[0].split("DOB:")[1].split("Sex:")[0].strip()
+        poi_dict["sex"] = poi[0].split("DOB:")[1].split("Sex:")[1].strip()
 
-    # Location and Eye Color appear on the second line.
-    poi_dict["home_location"] = poi[1].split("Eyes:")[0].strip().lower()
-    poi_dict["eyes"] = poi[1].split("Eyes:")[1].strip()
+        # Location and Eye Color appear on the second line.
+        poi_dict["home_location"] = poi[1].split("Eyes:")[0].strip().lower()
+        poi_dict["eyes"] = poi[1].split("Eyes:")[1].strip()
 
-    # Alias and hair color are on the third line, but alias is blank on this line.
-    poi_dict["hair"] = poi[2].split("Hair:")[1].strip()
+        # Alias and hair color are on the third line, but alias is blank on this line.
+        poi_dict["hair"] = poi[2].split("Hair:")[1].strip()
 
-    # The first alias and race are on the fourth line.
-    alias = poi[3].split("Race:")[0].strip()
-    poi_dict["race"] = poi[3].split("Race:")[1].strip()                          
+        # The first alias and race are on the fourth line.
+        alias = poi[3].split("Race:")[0].strip()
+        poi_dict["race"] = poi[3].split("Race:")[1].strip()                          
 
-    # The rest of the aliases are on subsequent lines.
-    remainder_alias = poi[4:len(poi)]
-    remainder_alias = [element.strip() for element in remainder_alias]
-    remainder_alias.append(alias)
-    poi_dict["alias"] = remainder_alias
+        # The rest of the aliases are on subsequent lines.
+        remainder_alias = poi[4:len(poi)]
+        remainder_alias = [element.strip() for element in remainder_alias]
+        remainder_alias.append(alias)
+        poi_dict["alias"] = remainder_alias
 
     return poi_dict, poi_end_index
 def extract_sqncs_and_sntncs(s_idx, s_lines, cur_docket_nr):
@@ -107,7 +117,7 @@ def extract_sqncs_and_sntncs(s_idx, s_lines, cur_docket_nr):
             break
 
         # If the current line is a new set of case statuses or a new county, the function is completed.
-        if((("closed" == cur_s_line or "inactive" == cur_s_line or "active" == cur_s_line or "adjudicated" == cur_s_line or cur_s_line in counties) and "continued" not in cur_s_line)):
+        if((("adjudicated/closed" == cur_s_line or "closed" == cur_s_line or "inactive" == cur_s_line or "active" == cur_s_line or "adjudicated" == cur_s_line or "physical case file destroyed" == cur_s_line or cur_s_line in counties) and "continued" not in cur_s_line)):
             break
         elif("proc status: " in cur_s_line):
             # If the previous line has continued, we need to investigate.
@@ -174,7 +184,7 @@ def extract_closed_cases(c_idx, c_lines):
             continue
 
         # If the current line has a case status, we have finished all closed cases.
-        if(("inactive" == cur_c_line or "active" == cur_c_line or "adjudicated" == cur_c_line) and "continued" not in cur_c_line):
+        if(("inactive" == cur_c_line or "active" == cur_c_line or "adjudicated" == cur_c_line or "closed" == cur_c_line or "adjudicated/closed" == cur_c_line or "physical case file destroyed" == cur_c_line) and "continued" not in cur_c_line):
             loop_through_closed_cases = False
         # Check if the current line is a new county.
         elif(cur_c_line in counties):
@@ -243,7 +253,7 @@ def extract_inactive_active_cases(ia_idx, ia_lines):
             continue
 
         # If the current line has a case status, we have finished all active/inactive/adjudicated cases.
-        if((("closed" == cur_ia_line or "inactive" == cur_ia_line or "active" == cur_ia_line or "adjudicated" == cur_ia_line) and "continued" not in cur_ia_line)):
+        if((("closed" == cur_ia_line or "inactive" == cur_ia_line or "active" == cur_ia_line or "adjudicated" == cur_ia_line or "adjudicated/closed" == cur_ia_line or "physical case file destroyed" == cur_ia_line) and "continued" not in cur_ia_line)):
             loop_through_ia_cases = False
         # Check if the current line is a new county.
         elif(cur_ia_line in counties):
@@ -357,7 +367,7 @@ for row in pdf_parse_table_df.itertuples():
         successfully_parsed_var = False
         progress_row = pd.DataFrame([{"file_name": row.file_name, "successfully_parsed": False, "time_stamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}])
         progress_row.to_csv(progress_file, index = False, mode = "a", header = False)
-        break 
+        break
 
     # Set-up dictionary for court summary/criminal background data.
     cs_dict = {}
@@ -368,12 +378,12 @@ for row in pdf_parse_table_df.itertuples():
         new_line_index = ""
         
         # Check if the current line is a new set of case (statuses).
-        if(("closed" in cur_line or "inactive" in cur_line or "active" in cur_line or "adjudicated" in cur_line) and "continued" not in cur_line):
+        if(("adjudicated/closed" in cur_line or "physical case file destroyed" in cur_line or "closed" in cur_line or "inactive" in cur_line or "active" in cur_line or "adjudicated" in cur_line) and "continued" not in cur_line):
             case_status = cur_line
             cs_dict[case_status] = {}
 
             # Increment the index by 1 because we want to start parsing the line following the case status line.
-            if(case_status == "closed"):
+            if(case_status == "closed" or case_status == "adjudicated/closed" or case_status == "physical case file destroyed"):
                 try:
                     result_tuple = extract_closed_cases(current_line_index + 1, lines)
                     logging.info("Successfully extracted closed cases.")

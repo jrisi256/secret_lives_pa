@@ -56,3 +56,4 @@ rsconnect/
 
 # Output
 output/
+*.rds

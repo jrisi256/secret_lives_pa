@@ -36,7 +36,7 @@ counties = [
             "huntingdon", "indiana", "jefferson", "juniata", "lackawanna",
             "lancaster", "lawrence", "lebanon", "lehigh", "luzerne", "lycoming",
             "mckean", "mercer", "mifflin", "monroe", "montgomery", "montour",
-            "northampton", "northumberla", "perry", "philadelphia", "pike",
+            "northampton", "northumberland", "perry", "philadelphia", "pike",
             "potter", "schuylkill", "snyder", "somerset", "sullivan",
             "susquehanna", "tioga", "union", "venango", "warren", "washington",
             "wayne", "westmoreland", "wyoming", "york"
@@ -45,6 +45,9 @@ counties = [
 # Declare functions.
 def extract_poi(lines_arg):
     poi_dict = {}
+
+    # Set the poi_start_index to be the first line of the page by default if you cannot find the court. Some PDFs have no data and this should capture that.
+    poi_start_index = 0
 
     # Beginning part of every court summary in court of common pleas has a block of text with person information.
     # Organizations do not have date of birth so we need another way to identify the beginning of the POI information.
@@ -57,7 +60,12 @@ def extract_poi(lines_arg):
                 poi_start_index = i
                 break
 
-    poi_end_index = [i for i,x in enumerate(lines) if "court:" in x.lower()][0]
+    # Set the poi_end_index to be the last line of the page if you cannot find the court. Some PDFs have no data and this should capture that.
+    try:
+        poi_end_index = [i for i,x in enumerate(lines) if "court:" in x.lower()][0]
+    except Exception as e:
+        poi_end_index = len(lines) - 1
+
     poi = lines[poi_start_index:poi_end_index]
 
     # Name, DOB, and Sex appear on the first line. Very rarely they do not (such as when it's an organization who is the defendant).
@@ -79,16 +87,22 @@ def extract_poi(lines_arg):
 
     # For organizations, the personal information will only be 3 lines.
     if(len(poi) > 3):
-        # Hair color is on the third line.
-        poi_dict["hair"] = poi[2].split("Hair:")[1].strip()
+        # Hair color is on the third line although some organizations/people do not have hair.
+        if("Hair:" in poi[2]):
+            poi_dict["hair"] = poi[2].split("Hair:")[1].strip()
+        else:
+            poi_dict["hair"] = ""
 
-        # Race is on the fourth line.
-        poi_dict["race"] = poi[3].split("Race:")[1].strip()
+        # Race is on the fourth line although some organizations/people do not have race.
+        if("Race:" in poi[3]):
+            poi_dict["race"] = poi[3].split("Race:")[1].strip()
+        else:
+            poi_dict["race"] = ""
 
         # On the fifth line, if the person has an alias, their aliases will be listed here.
         # If they do not have any aliases, the PDF immediately starts the criminal history.
         poi_dict["alias"] = ""
-        if(len(poi) > 4):
+        if(len(poi) > 4 and "Aliases:" in poi[4]):
             poi_dict["alias"] = poi[4].split("Aliases:")[1].strip()
 
     return poi_dict, poi_end_index
@@ -312,7 +326,6 @@ for row in pdf_parse_table_df.itertuples():
         successfully_parsed_var = False
         progress_row = pd.DataFrame([{"file_name": row.file_name, "successfully_parsed": False, "time_stamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}])
         progress_row.to_csv(progress_file, index = False, mode = "a", header = False)
-        break 
 
     # Set-up dictionary for court summary/criminal background data.
     ch_dict = {}
