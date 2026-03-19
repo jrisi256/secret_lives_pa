@@ -3,16 +3,8 @@ library(purrr)
 library(dplyr)
 library(tidyr)
 library(readxl)
-library(rrapply)
 library(stringr)
-library(jsonlite)
 library(lubridate)
-
-read_dir <-
-    here(
-        "output", "pdf_parse_list", "json",
-        "json_cs_MJ_CR_Allegheny_Blair_Centre_Dauphin_Erie_Montgomery"
-    )
 
 ################################################################################
 # Read in JSON files + code book.
@@ -30,32 +22,9 @@ codebook <-
         id = str_replace_all(id, "_+", "_")
     )
 
-list_of_files <- list.files(read_dir)
-list_of_json <-
-    map(
-        list_of_files,
-        function(file, path) {read_json(file.path(path, file))},
-        path = read_dir
-    )
-names <- str_replace(list_of_files, ".json", "")
-list_of_json <- list_of_json |> set_names(names)
-
 ################################################################################
 # Flatten JSON files into a data frame.
 ################################################################################
-flattened_json <-
-    rrapply(
-        list_of_json,
-        condition = function(x, .xname) {
-            .xname %in%
-                c(
-                    "dob", "eyes", "sex", "hair", "race", "docket_number",
-                    "arrest_date", "disp_event_date", "last_action_date",
-                    "statute", "grade", "descriptions", "disposition", "counts"
-                )
-        },
-        how = "melt"
-    )
 
 
 

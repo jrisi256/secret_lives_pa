@@ -197,3 +197,120 @@ The same thing happened for Erie county for the above dates.
 39. MJ-06302-CR-0000080-2019 is really MJ-06301-TR-0000625-2019 (and vice versa).
     1. Removed fake MJ-06302-CR-0000080-2019.
     2. Downloaded real MJ-06302-CR-0000080-2019.
+
+## Linking lawyers to supreme court numbers
+
+The following lawyer were not able to be linked to a supreme court number. In some cases when an office is listed, there would be instances in which a supreme court number was also listed. In those cases, we are able to keep that entry.
+
+* , p.c. daffner & associates, esq.
+* ., esq.
+* adshead, llp hughes,kalkbrenner &, esq.
+* allegheny county district attorney's office
+* allegheny county public defenders office
+* ann johns, esq. --> Could be Anne Naomi John as they appear on the same docket, but I cannot know for certain.
+* aul kov. public defender p, esq. and paul kov. public defender, esq. --> Paul John Kovatch or Richard Paul Kovacs? Likely Kovatch? Can't be sure.
+* beaver county district attorney's office
+* bedford county district attorney's office
+* berks county district attorney, esq.
+* blair county district attorney's office
+* blair county public defenders office
+* boyd & karver, esq.
+* brian atty. jones, esq. --> Unclear which Brian Jones this could be.
+* bucks county public defenders office
+* c defender dauphin county publi, esq.
+* c defenders dauphin county publi, esq.
+* c walfish & noonan, ll, esq.
+* cambria county district attorney's office
+* cambria county public defenders office
+* carluccio, esq. --> Unclear if this is Thomas or Carolyn Carluccio.
+* centre county district attorney's office
+* centre county public defenders office
+* chester county district attorney's office
+* chris hoffman, esq. and christopher hoffman, esq. --> Unclear if they are Christopher M. Hoffman or Paul Christopher Hoffman.
+* christopher parisi, esq. --> They could be Chris S. or Chris E. We cannot tell.
+* clark & mcgill, p.c, esq.
+* clint kelley, esq. --> The closest match is Gregory Clinton Kelley, but I can't be certain these are the same person.
+* da's office, esq.
+* dan regan, esq. --> We think he is different from Daniel Donahue, but we are not sure.
+* dauphin county district attorney
+* dauphin county district attorney's office
+* dauphin county public defenders office",
+* david sharger, esq. --> They could be David S. or David J. There is no way to tell.
+* david walker, esq. --> There are too many potential David Walker's to identify which one this one is.
+* deactivated, esq.
+* defender public, esq.
+* delaware county public defenders office
+* dennis blackwell, esq. --> They could be junior or senior (both work at the same location).
+* district attorney, esq.
+* district atty, esq.
+* donald turner, esq. --> They could be Donald Charles Turner or Donald N. Turner.
+* edward smith, esq. --> There are too many potential Edward Smith's to identify which one this one is.
+* eric hoffmann, esq. --> They could be Eric D. or just Eric.
+* erie county district attorney's office
+* erie county public defenders office
+* ernest sharif, esq. and ernest shariff, esq. --> They could be Ernest H. or just Ernest.
+* fice public defender's of, esq.
+* haff, esq.
+* heather kelley, esq. --> They could be Heather Kelly, Heather Anne, or Heather Zink.
+* ice public defenders off, esq.
+* ict attorney dauphin county distr, esq.
+* jack dwyer, esq. --. They could be John Dwyer.
+* joe williams, esq. and joseph williams, esq. --> There are too many potential Joe Williams's to identify which one this one is.
+* atty. lee rothman, esq., lee atty. rothman, esq., and lee rothman, esq. --> They could be Lee M. or Lee G.
+
+## Bail
+
+We start with 410,429 docket sheets.
+
+* Cases without any bail information are dropped (n = 65,791).
+* Cases which: 1) originated in the court of common pleas, or 2) did not otherwise represent the initial bond setting are dropped (n = 39,161).
+* Cases with: 1) monetary bail but the monetary amount was 0 or 2) non-monetary bail but the amount was greater than 0 are dropped (n = 2).
+* Final sample size is 305,475.
+
+## Judges + Demographic information
+
+We start with 305,475 docket sheets with valid bail information. Cases with a missing judge overwhelmingly come from municipal courts in Pittsburgh. Cases that are not missing the judge but have generic office titles come predominantly from night court and central courts. There is no case from any of these courts that has a judge listed.
+
+* We drop 81,977 cases with missing judicial information leaving us with 223,498 cases.
+* We drop 5,646 cases with either missing sex, race, or age of the defendant leaving us with 217,852 cases.
+  * 1,616 cases are missing the sex of the defendant.
+  * 4,764 cases are missing the race of the defendant.
+  * 1,481 cases are missing the age of the defendant.
+
+## Lawyers
+
+We start with 217,852 cases.
+
+* 44,935 cases are missing both the prosecutor and defense attorney. Cases can have a missing attorney due to: 1) the attorneys are truly missing (i.e., no one was listed), 2) only a generic office was listed, or 3) a defense attorney's listed client was the state or a prosecutor's listed client was the defendant. These cases are dropped.
+  * Of the remaining cases, 80,363 are missing the prosecutor. We drop these as well.
+  * Of the remaining cases, 18,447 are missing the defense.
+    * Of these cases, there were 5,863 cases in which the defendant either requested counsel and/or was provided an application for the appointment of a public defender.
+    * The reason I bring this up is because the vast majority of these cases featured a defendant who did not want/did not seek out/were not eligible for a defense attorney or was not made properly aware of their ability to utilize a defense attorney.
+    * In our main analyses these cases are dropped, but we can still do something interesting with them potentially.
+* Our final sample size is 74,107.
+
+## Charges
+
+The 74,107 cases have a cumulative 191,038 charges associated with them.
+
+* 87,134 charges (45.61%) matched with the Pennsylvania Crime Code.
+* 41,179 charges (21.56%) matched with the Pennsylvania Crime Code after either adding or removing a star.
+* 20,221 charges (10.58%) did not match based on the charge but did match based on the Statutory Class (where we used the omnibus offense gravity score (OGS)).
+* 31,705 charges (16.6%) were summary charges and were assigned an OGS of 0.
+* 5,579 charges (2.92%) did not have a grade and could only be matched on charge.
+* 2,107 charges (1.1%) did not have a grade and could only be matched on charge after adding or removing a star.
+* 1,673 charges (0.88%) were manually assigned a Statutory Class by reviewing the charge description (and then matched based on Statutory Class where the omnibus OGS was used).
+* 1,440 charges (0.75%) could not be assigned a Statutory Class even after manual review and thus do not have an OGS.
+
+80 cases are dropped due to the fact that all of their charges are missing their OGS. After dropping theses cases, 4,156 cases remain that have at least one (but not all) of their charges missing the OGS score (we keep these cases). Final sample is 74,027.
+
+## Court summary sheets
+
+### Sex, Race, DOB
+
+Any cases in which race, sex, or year of birth do not match across the docket sheet and court summary sheet leads to the case being dropped and recoded to missing. Some cases which were missing their sex/race/DOB in the docket sheet did not have them missing in their court summary. However, these cases were still missing other pertinent variables (e.g., prosecutor or judge).
+
+* 2 cases are dropped due to mismatched race.
+* 10 cases are dropped due to mismatched years of birth.
+
+Final sample size is 74,015.

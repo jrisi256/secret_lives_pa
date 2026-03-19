@@ -1,5 +1,8 @@
+library(here)
 library(purrr)
 library(dplyr)
+library(readr)
+library(tidyr)
 library(ggplot2)
 library(stringr)
 library(jsonlite)
@@ -19,7 +22,6 @@ nr_lawyers <-
 nr_bail <-
     map(list_of_json, function(json) {length(json$bail$bail_info)}) |> unlist()
 
-################################################################################
 capture_lawyer_attr <- function(json, lawyer_nr, attribute) {
     if(is.null(json$attorney_info[[lawyer_nr]][[attribute]]))
         return("")
@@ -347,115 +349,137 @@ data_df <-
             unlist()
     )
 
-data_df_cleaned <-
-    data_df |>
-    select(matches("id|judge|lawyer|bail_one")) |>
+################################################################################
+list_of_json <-
+    readRDS(here("output", "pdf_parse_list", "flattened_json_ds_mj.rds")) |>
+    group_by(L1) |>
+    filter(any(value == "centre")) |>
+    ungroup() |>
     filter(
-        bail_one_action != "" & bail_one_action != "common pleas - revoke",
-        lawyer_one_name != "" | lawyer_two_name != "" | lawyer_three_name != "" | lawyer_four_name != "" | lawyer_five_name != ""
+        (L2 == "attorney_info" & L4 == "name") |
+            (L2 == "attorney_info" & L4 == "type") |    
+            L3 == "judge_assigned" |
+            L3 == "bail_info" & L5 == "bail_action" |
+            L3 == "bail_info" & L5 == "bail_type"
+    ) |>
+    mutate(
+        L3 = if_else(L3 == "bail_info", L4, L3),
+        L4 = if_else(str_detect(L4, "bail_nr_"), L5, L4)
+    ) |>
+    pivot_wider(
+        id_cols = "L1", names_from = c("L3", "L4"), values_from = "value"
+    ) |>
+    select(-matches("bail_nr_[1-9]")) |>
+    rename("judge" = "judge_assigned_NA")
+
+data_df_cleaned <-
+    list_of_json |>
+    filter(
+        bail_nr_0_bail_action != "" & bail_nr_0_bail_action != "common pleas - revoke",
+        lawyer_nr_0_name != "" | lawyer_nr_1_name != "" | lawyer_nr_2_name != "" | lawyer_nr_3_name != "" | lawyer_nr_4_name != ""
     ) |>
     mutate(
         bail_one_type =
             case_when(
-                bail_one_type == "ror - common pleas" ~ "ROR",
-                bail_one_type == "" ~ "Denied",
-                bail_one_type == "nonmonetary" ~ "Unsecured or Non-monetary",
-                bail_one_type == "unsecured" ~ "Unsecured or Non-monetary",
-                bail_one_type == "monetary" ~ "Monetary",
-                bail_one_type == "ror" ~ "ROR",
-                T ~ bail_one_type
+                bail_nr_0_bail_type == "ror - common pleas" ~ "ROR",
+                bail_nr_0_bail_type == "" ~ "Denied",
+                bail_nr_0_bail_type == "nonmonetary" ~ "Unsecured or Non-monetary",
+                bail_nr_0_bail_type == "unsecured" ~ "Unsecured or Non-monetary",
+                bail_nr_0_bail_type == "monetary" ~ "Monetary",
+                bail_nr_0_bail_type == "ror" ~ "ROR",
+                T ~ bail_nr_0_bail_type
             ),
         prosecutor =
             case_when(
-                lawyer_one_type == "assistant district attorney" ~ lawyer_one_name,
-                lawyer_one_type == "district attorney" ~ lawyer_one_name,
-                lawyer_one_type == "attorney general" ~ lawyer_one_name,
-                lawyer_one_type == "special prosectuor" ~ lawyer_one_name,
-                lawyer_one_type == "complainant's attorney" ~ lawyer_one_name
+                lawyer_nr_0_type == "assistant district attorney" ~ lawyer_nr_0_name,
+                lawyer_nr_0_type == "district attorney" ~ lawyer_nr_0_name,
+                lawyer_nr_0_type == "attorney general" ~ lawyer_nr_0_name,
+                lawyer_nr_0_type == "special prosectuor" ~ lawyer_nr_0_name,
+                lawyer_nr_0_type == "complainant's attorney" ~ lawyer_nr_0_name
             ),
         defense =
             case_when(
-                lawyer_one_type == "private" ~ lawyer_one_name,
-                lawyer_one_type == "public defender" ~ lawyer_one_name,
-                lawyer_one_type == "court appointed" ~ lawyer_one_name,
-                lawyer_one_type == "conflict counsel" ~ lawyer_one_name,
-                lawyer_one_type == "court appointed - public defender" ~ lawyer_one_name,
-                lawyer_one_type == "court appointed - private" ~ lawyer_one_name
+                lawyer_nr_0_type == "private" ~ lawyer_nr_0_name,
+                lawyer_nr_0_type == "public defender" ~ lawyer_nr_0_name,
+                lawyer_nr_0_type == "court appointed" ~ lawyer_nr_0_name,
+                lawyer_nr_0_type == "conflict counsel" ~ lawyer_nr_0_name,
+                lawyer_nr_0_type == "court appointed - public defender" ~ lawyer_nr_0_name,
+                lawyer_nr_0_type == "court appointed - private" ~ lawyer_nr_0_name
             ),
         prosecutor =
             case_when(
-                lawyer_two_type == "assistant district attorney" & is.na(prosecutor) ~ lawyer_two_name,
-                lawyer_two_type == "district attorney" & is.na(prosecutor) ~ lawyer_two_name,
-                lawyer_two_type == "attorney general" & is.na(prosecutor) ~ lawyer_two_name,
-                lawyer_two_type == "special prosectuor" & is.na(prosecutor) ~ lawyer_two_name,
-                lawyer_two_type == "complainant's attorney" & is.na(prosecutor) ~ lawyer_two_name,
+                lawyer_nr_1_type == "assistant district attorney" & is.na(prosecutor) ~ lawyer_nr_1_name,
+                lawyer_nr_1_type == "district attorney" & is.na(prosecutor) ~ lawyer_nr_1_name,
+                lawyer_nr_1_type == "attorney general" & is.na(prosecutor) ~ lawyer_nr_1_name,
+                lawyer_nr_1_type == "special prosectuor" & is.na(prosecutor) ~ lawyer_nr_1_name,
+                lawyer_nr_1_type == "complainant's attorney" & is.na(prosecutor) ~ lawyer_nr_1_name,
                 !is.na(prosecutor) ~ prosecutor
             ),
         defense =
             case_when(
-                lawyer_two_type == "private" & is.na(defense) ~ lawyer_two_name,
-                lawyer_two_type == "public defender" & is.na(defense) ~ lawyer_two_name,
-                lawyer_two_type == "court appointed" & is.na(defense) ~ lawyer_two_name,
-                lawyer_two_type == "conflict counsel" & is.na(defense) ~ lawyer_two_name,
-                lawyer_two_type == "court appointed - public defender" & is.na(defense) ~ lawyer_two_name,
-                lawyer_two_type == "court appointed - private" & is.na(defense) ~ lawyer_two_name,
+                lawyer_nr_1_type == "private" & is.na(defense) ~ lawyer_nr_1_name,
+                lawyer_nr_1_type == "public defender" & is.na(defense) ~ lawyer_nr_1_name,
+                lawyer_nr_1_type == "court appointed" & is.na(defense) ~ lawyer_nr_1_name,
+                lawyer_nr_1_type == "conflict counsel" & is.na(defense) ~ lawyer_nr_1_name,
+                lawyer_nr_1_type == "court appointed - public defender" & is.na(defense) ~ lawyer_nr_1_name,
+                lawyer_nr_1_type == "court appointed - private" & is.na(defense) ~ lawyer_nr_1_name,
                 !is.na(defense) ~ defense
             ),
         prosecutor =
             case_when(
-                lawyer_three_type == "assistant district attorney" & is.na(prosecutor) ~ lawyer_three_name,
-                lawyer_three_type == "district attorney" & is.na(prosecutor) ~ lawyer_three_name,
-                lawyer_three_type == "attorney general" & is.na(prosecutor) ~ lawyer_three_name,
-                lawyer_three_type == "special prosectuor" & is.na(prosecutor) ~ lawyer_three_name,
-                lawyer_three_type == "complainant's attorney" & is.na(prosecutor) ~ lawyer_three_name,
+                lawyer_nr_2_type == "assistant district attorney" & is.na(prosecutor) ~ lawyer_nr_2_name,
+                lawyer_nr_2_type == "district attorney" & is.na(prosecutor) ~ lawyer_nr_2_name,
+                lawyer_nr_2_type == "attorney general" & is.na(prosecutor) ~ lawyer_nr_2_name,
+                lawyer_nr_2_type == "special prosectuor" & is.na(prosecutor) ~ lawyer_nr_2_name,
+                lawyer_nr_2_type == "complainant's attorney" & is.na(prosecutor) ~ lawyer_nr_2_name,
                 !is.na(prosecutor) ~ prosecutor
             ),
         defense =
             case_when(
-                lawyer_three_type == "private" & is.na(defense) ~ lawyer_three_name,
-                lawyer_three_type == "public defender" & is.na(defense) ~ lawyer_three_name,
-                lawyer_three_type == "court appointed" & is.na(defense) ~ lawyer_three_name,
-                lawyer_three_type == "conflict counsel" & is.na(defense) ~ lawyer_three_name,
-                lawyer_three_type == "court appointed - public defender" & is.na(defense) ~ lawyer_three_name,
-                lawyer_three_type == "court appointed - private" & is.na(defense) ~ lawyer_three_name,
+                lawyer_nr_2_type == "private" & is.na(defense) ~ lawyer_nr_2_name,
+                lawyer_nr_2_type == "public defender" & is.na(defense) ~ lawyer_nr_2_name,
+                lawyer_nr_2_type == "court appointed" & is.na(defense) ~ lawyer_nr_2_name,
+                lawyer_nr_2_type == "conflict counsel" & is.na(defense) ~ lawyer_nr_2_name,
+                lawyer_nr_2_type == "court appointed - public defender" & is.na(defense) ~ lawyer_nr_2_name,
+                lawyer_nr_2_type == "court appointed - private" & is.na(defense) ~ lawyer_nr_2_name,
                 !is.na(defense) ~ defense
             ),
         prosecutor =
             case_when(
-                lawyer_four_type == "assistant district attorney" & is.na(prosecutor) ~ lawyer_four_name,
-                lawyer_four_type == "district attorney" & is.na(prosecutor) ~ lawyer_four_name,
-                lawyer_four_type == "attorney general" & is.na(prosecutor) ~ lawyer_four_name,
-                lawyer_four_type == "special prosectuor" & is.na(prosecutor) ~ lawyer_four_name,
-                lawyer_four_type == "complainant's attorney" & is.na(prosecutor) ~ lawyer_four_name,
+                lawyer_nr_3_type == "assistant district attorney" & is.na(prosecutor) ~ lawyer_nr_3_name,
+                lawyer_nr_3_type == "district attorney" & is.na(prosecutor) ~ lawyer_nr_3_name,
+                lawyer_nr_3_type == "attorney general" & is.na(prosecutor) ~ lawyer_nr_3_name,
+                lawyer_nr_3_type == "special prosectuor" & is.na(prosecutor) ~ lawyer_nr_3_name,
+                lawyer_nr_3_type == "complainant's attorney" & is.na(prosecutor) ~ lawyer_nr_3_name,
                 !is.na(prosecutor) ~ prosecutor
             ),
         defense =
             case_when(
-                lawyer_four_type == "private" & is.na(defense) ~ lawyer_four_name,
-                lawyer_four_type == "public defender" & is.na(defense) ~ lawyer_four_name,
-                lawyer_four_type == "court appointed" & is.na(defense) ~ lawyer_four_name,
-                lawyer_four_type == "conflict counsel" & is.na(defense) ~ lawyer_four_name,
-                lawyer_four_type == "court appointed - public defender" & is.na(defense) ~ lawyer_four_name,
-                lawyer_four_type == "court appointed - private" & is.na(defense) ~ lawyer_four_name,
+                lawyer_nr_3_type == "private" & is.na(defense) ~ lawyer_nr_3_name,
+                lawyer_nr_3_type == "public defender" & is.na(defense) ~ lawyer_nr_3_name,
+                lawyer_nr_3_type == "court appointed" & is.na(defense) ~ lawyer_nr_3_name,
+                lawyer_nr_3_type == "conflict counsel" & is.na(defense) ~ lawyer_nr_3_name,
+                lawyer_nr_3_type == "court appointed - public defender" & is.na(defense) ~ lawyer_nr_3_name,
+                lawyer_nr_3_type == "court appointed - private" & is.na(defense) ~ lawyer_nr_3_name,
                 !is.na(defense) ~ defense
             ),
         prosecutor =
             case_when(
-                lawyer_five_type == "assistant district attorney" & is.na(prosecutor) ~ lawyer_five_name,
-                lawyer_five_type == "district attorney" & is.na(prosecutor) ~ lawyer_five_name,
-                lawyer_five_type == "attorney general" & is.na(prosecutor) ~ lawyer_five_name,
-                lawyer_five_type == "special prosectuor" & is.na(prosecutor) ~ lawyer_five_name,
-                lawyer_five_type == "complainant's attorney" & is.na(prosecutor) ~ lawyer_five_name,
+                lawyer_nr_4_type == "assistant district attorney" & is.na(prosecutor) ~ lawyer_nr_4_name,
+                lawyer_nr_4_type == "district attorney" & is.na(prosecutor) ~ lawyer_nr_4_name,
+                lawyer_nr_4_type == "attorney general" & is.na(prosecutor) ~ lawyer_nr_4_name,
+                lawyer_nr_4_type == "special prosectuor" & is.na(prosecutor) ~ lawyer_nr_4_name,
+                lawyer_nr_4_type == "complainant's attorney" & is.na(prosecutor) ~ lawyer_nr_4_name,
                 !is.na(prosecutor) ~ prosecutor
             ),
         defense =
             case_when(
-                lawyer_five_type == "private" & is.na(defense) ~ lawyer_five_name,
-                lawyer_five_type == "public defender" & is.na(defense) ~ lawyer_five_name,
-                lawyer_five_type == "court appointed" & is.na(defense) ~ lawyer_five_name,
-                lawyer_five_type == "conflict counsel" & is.na(defense) ~ lawyer_five_name,
-                lawyer_five_type == "court appointed - public defender" & is.na(defense) ~ lawyer_five_name,
-                lawyer_five_type == "court appointed - private" & is.na(defense) ~ lawyer_five_name,
+                lawyer_nr_4_type == "private" & is.na(defense) ~ lawyer_nr_4_name,
+                lawyer_nr_4_type == "public defender" & is.na(defense) ~ lawyer_nr_4_name,
+                lawyer_nr_4_type == "court appointed" & is.na(defense) ~ lawyer_nr_4_name,
+                lawyer_nr_4_type == "conflict counsel" & is.na(defense) ~ lawyer_nr_4_name,
+                lawyer_nr_4_type == "court appointed - public defender" & is.na(defense) ~ lawyer_nr_4_name,
+                lawyer_nr_4_type == "court appointed - private" & is.na(defense) ~ lawyer_nr_4_name,
                 !is.na(defense) ~ defense
             ),
         prosecutor =
@@ -479,7 +503,7 @@ data_df_cleaned <-
                 T ~ defense
             ),
     ) |>
-    select(-bail_one_action) |>
+    select(-bail_nr_0_bail_action) |>
     group_by(judge) |>
     mutate(judge_id = paste0("Judge ", cur_group_id())) |>
     ungroup() |>
