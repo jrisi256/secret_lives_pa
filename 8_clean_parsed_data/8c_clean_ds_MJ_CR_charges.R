@@ -195,6 +195,8 @@ charges_no_grade <-
     charges_df |>
     filter(grade == "" | grade == "none" | grade == "0" | grade == "ic")
 
+raw_levels <- unique(codebook_charge_id$`Statutory Class`)
+
 codebook_by_charge <-
     codebook_charge_id |>
     filter(
@@ -203,11 +205,33 @@ codebook_by_charge <-
         !str_detect(Description, "Unlaw. contact") | `Statutory Class` == "f3",
         !is.na(`Offense Gravity Score`)
     ) |>
+    mutate(
+        `Statutory Class` =
+            if_else(
+                `Statutory Class` %in% c("f31", "f32"), "f3", `Statutory Class`
+            ),
+        # Order of non-misdemeanor, non-felony, non-homicides do no matter.
+        `Statutory Class` =
+            factor(
+                `Statutory Class`,
+                levels =
+                    c(
+                        str_extract(raw_levels, ".*905"),
+                        str_extract(raw_levels, ".*1102.*"),
+                        str_extract(raw_levels, ".*2710.*"),
+                        "same as corresponding offense under 18 pa.c.s. chapter 30",
+                        "m", "m3", "m2", "m1", "f", "f3", "f2", "f1", "h2", "h1"
+                    ),
+                ordered = T
+            )
+    ) |>
     group_by(charge_id) |>
     summarise(
         mean_ogs_score = calc_ogs_score(`Offense Gravity Score`, "mean"),
         max_ogs_score = calc_ogs_score(`Offense Gravity Score`, "max"),
-        min_ogs_score = calc_ogs_score(`Offense Gravity Score`, "min")
+        min_ogs_score = calc_ogs_score(`Offense Gravity Score`, "min"),
+        max_grade = max(`Statutory Class`),
+        min_grade = min(`Statutory Class`)
     ) |>
     mutate(omni_ogs_score = mean_ogs_score) |>
     ungroup()
@@ -371,6 +395,10 @@ charges_df_final <-
         charges_no_grade_matching, charges_no_grade_stars_fixed,
         charges_fixed_by_hand, charges_summary, charges_not_fixed_by_hand
     ) |>
-    select(-L3, -nr, -charge_id, -new_charge_id)
+    mutate(
+        max_grade = if_else(is.na(max_grade), grade, max_grade),
+        min_grade = if_else(is.na(min_grade), grade, min_grade)
+    ) |>
+    select(-L3, -nr, -charge_id, -new_charge_id, -grade)
 
 write_csv(charges_df_final, here("output", "final_data", "ds_MJ_CR_charges.csv"))

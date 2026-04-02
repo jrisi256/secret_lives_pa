@@ -254,9 +254,108 @@ The following lawyer were not able to be linked to a supreme court number. In so
 * heather kelley, esq. --> They could be Heather Kelly, Heather Anne, or Heather Zink.
 * ice public defenders off, esq.
 * ict attorney dauphin county distr, esq.
-* jack dwyer, esq. --. They could be John Dwyer.
+* jack dwyer, esq. --> They could be John Dwyer.
 * joe williams, esq. and joseph williams, esq. --> There are too many potential Joe Williams's to identify which one this one is.
 * atty. lee rothman, esq., lee atty. rothman, esq., and lee rothman, esq. --> They could be Lee M. or Lee G.
+* law care, esq.
+* mauger & meter, esq.
+* montgomery county district attorney's office
+* montgomery county public defenders office
+* pd's office, esq.
+* public def, esq.; public defender
+* public defender, esq.
+* public defenders, esq.
+* s newman and associate, esq.
+* soc. keenan,ciccitto & as, esq.
+* sociates keenan ciccitto & as, esq.
+* urer dauphin county treas, esq.
+* ralph frank --> Could be Frank W. Ralph or their own person. They remain blank
+* rhin, esq. --> Uncertain if this is a unique person or not.
+
+### Lawyers given a unique supreme court number by us
+
+The following lawyers did not have a supreme court number, but we decided to give them one.
+
+1. r.emmett madden, esq. --> 000002
+2. adam hobaugh, esq. --> 000006
+3. alexndria kramer --> 000001
+4. alyssa john, esq. --> 000007
+5. amanda chesar --> 000008
+6. anthony beeraro, esq. --> 000010
+7. anthony borello, esq. --> 000011
+8. anthony moses --> 000012
+9. barb swartz, esq. --> 000013
+10. bob heyward, esq. --> 000014
+11. brad breslin, esq. --> 000015
+12. cassie vasicak --> 000016
+13. charles fidel, esq. --> 000017
+14. daniel n. schwartz, esq. --> 000018
+15. david campbell, esq. --> 000019
+16. donald minahan, esq. --> 000020
+17. duke morris, esq." ~ "000021
+18. erica burry --> 000022
+19. fincourt b. shelton, esq. --> 000023
+20. foley law offices of jerry, esq. --> 000024
+21. francis a. mccormick --> 000025
+22. gail marr-williams --> 000026
+23. glenn j. smith --> 000027
+24. greg mcfarland, esq. --> 000028
+25. name == "hart hillman, esq. --> 000030
+26. hary chestnut, vernon zac, esq. --> 000009
+27. james black, esq. --> 000031
+28. jean trenbeath --> 000032
+29. jerry atty. sklavounakis, esq. --> 000000
+30. jerry johnson, esq. --> 000033
+31. jesse juilante, esq. --> 000034
+32. john burt, esq. --> 000035
+33. john mccall, esq. --> 000036
+34. john n. salla --> 000037
+35. john noonan, esq. --> 000039
+36. matt dugan, esq. + matt dugan, esq. --> 900001
+37. michael yoder, esq. + michael yoder-pd, esq. --> 900002
+38. mark r. falconi --> 900004
+39. mackenzie iocona --> 900005
+40. ray gricar --> 900007
+41. richard p. gilmore, esq. --> 900009
+42. robert eskra --> 900010
+43. robert murphy, esq. --> 900011
+44. robert stewart, esq. --> 900012
+45. robert vinceler, esq --> 900013
+46. ronald atty. haywood + ronald haywood, esq. --> 900014
+47. ryan stewart --> 900015
+48. sandra stone, esq. --> 900016
+49. stephie kapourales, esq. --> 900017
+50. steven a. liss --> 900018
+51. theodore a. bugda --> 900019
+52. timothy mccullough, esq. --> 900020
+53. trevor north --> 900021
+54. william byrd, esq. --> 900022
+55. william fleske, esq. --> 900023
+56. william lyons, esq. --> 900024
+57. william karl wigman, esq. --> 900025
+58. natalie heil, esq. --> 900028
+60. paula hutchinson, esq. --> 900029
+61. michelle collins, esq. --> 900030
+62. michael profeta, esq. --> 900031
+63. megan flores, esq. --> 900032
+64. kaalil muhammad, esq. --> 900033
+65. martin scaratow, esq. --> 900034
+66. mcgraw larry, esq. --> 900035
+67. patrick atty. coyne, esq. --> 900036
+68. julia l. dellinger --> 900037
+69. thomas pratt + thomas pratt, esq. --> 900038
+70. vincent a. cirillo jr. + vincent a. cirillo jr., esq. --> 90003
+71. megan strait --> 900040
+72. kathryn hunter-nonas --> 900042
+73. karen avery, esq. --> 900043
+74. nick peters --> 900044
+75. nialena caravasos, esq. --> 900045
+76. kyle mcgee, esq. --> 900046
+77. larr barto, esq. --> 900047
+78. lawrence singer, esq. --> 900048
+79. k wynett, esq. --> 900049
+80. kristyne sharpe --> 900050
+81. kim spackman --> 900051
 
 ## Bail
 
@@ -281,28 +380,28 @@ We start with 305,475 docket sheets with valid bail information. Cases with a mi
 
 We start with 217,852 cases.
 
-* 44,935 cases are missing both the prosecutor and defense attorney. Cases can have a missing attorney due to: 1) the attorneys are truly missing (i.e., no one was listed), 2) only a generic office was listed, or 3) a defense attorney's listed client was the state or a prosecutor's listed client was the defendant. These cases are dropped.
-  * Of the remaining cases, 80,363 are missing the prosecutor. We drop these as well.
-  * Of the remaining cases, 18,447 are missing the defense.
-    * Of these cases, there were 5,863 cases in which the defendant either requested counsel and/or was provided an application for the appointment of a public defender.
+* 44,739 cases are missing both the prosecutor and defense attorney. Cases can have a missing attorney due to: 1) the attorneys are truly missing (i.e., no one was listed), 2) only a generic office was listed, or 3) a defense attorney's listed client was the state or a prosecutor's listed client was the defendant. These cases are dropped.
+  * Of the remaining cases, 80,309 are missing the prosecutor. We drop these as well.
+  * Of the remaining cases, 18,452 are missing the defense.
+    * Of these cases, there were 5,846 cases in which the defendant either requested counsel and/or was provided an application for the appointment of a public defender.
     * The reason I bring this up is because the vast majority of these cases featured a defendant who did not want/did not seek out/were not eligible for a defense attorney or was not made properly aware of their ability to utilize a defense attorney.
     * In our main analyses these cases are dropped, but we can still do something interesting with them potentially.
-* Our final sample size is 74,107.
+* Our final sample size is 74,352.
 
 ## Charges
 
-The 74,107 cases have a cumulative 191,038 charges associated with them.
+The 74,352 cases have a cumulative 191,693 charges associated with them.
 
-* 87,134 charges (45.61%) matched with the Pennsylvania Crime Code.
-* 41,179 charges (21.56%) matched with the Pennsylvania Crime Code after either adding or removing a star.
-* 20,221 charges (10.58%) did not match based on the charge but did match based on the Statutory Class (where we used the omnibus offense gravity score (OGS)).
-* 31,705 charges (16.6%) were summary charges and were assigned an OGS of 0.
-* 5,579 charges (2.92%) did not have a grade and could only be matched on charge.
-* 2,107 charges (1.1%) did not have a grade and could only be matched on charge after adding or removing a star.
-* 1,673 charges (0.88%) were manually assigned a Statutory Class by reviewing the charge description (and then matched based on Statutory Class where the omnibus OGS was used).
-* 1,440 charges (0.75%) could not be assigned a Statutory Class even after manual review and thus do not have an OGS.
+* 87,427 charges (45.61%) matched with the Pennsylvania Crime Code.
+* 41,320 charges (21.56%) matched with the Pennsylvania Crime Code after either adding or removing a star.
+* 20,308 charges (10.59%) did not match based on the charge but did match based on the Statutory Class (where we used the omnibus offense gravity score (OGS)).
+* 31,787 charges (16.58%) were summary charges and were assigned an OGS of 0.
+* 5,624 charges (2.93%) did not have a grade and could only be matched on charge.
+* 2,112 charges (1.1%) did not have a grade and could only be matched on charge after adding or removing a star.
+* 1,673 charges (0.87%) were manually assigned a Statutory Class by reviewing the charge description (and then matched based on Statutory Class where the omnibus OGS was used).
+* 1,442 charges (0.75%) could not be assigned a Statutory Class even after manual review and thus do not have an OGS.
 
-80 cases are dropped due to the fact that all of their charges are missing their OGS. After dropping theses cases, 4,156 cases remain that have at least one (but not all) of their charges missing the OGS score (we keep these cases). Final sample is 74,027.
+81 cases are dropped due to the fact that all of their charges are missing their OGS. After dropping theses cases, 626 cases remain that have at least one (but not all) of their charges missing the OGS score (we keep these cases). Final sample is 74,271.
 
 ## Court summary sheets
 
@@ -313,4 +412,16 @@ Any cases in which race, sex, or year of birth do not match across the docket sh
 * 2 cases are dropped due to mismatched race.
 * 10 cases are dropped due to mismatched years of birth.
 
-Final sample size is 74,015.
+Final sample size is 74,259.
+
+### Criminal history
+
+* 39.364 cases have at least one case in their criminal history where it could not be determined if that case came before or after the focal case.
+* 1,525 cases have totally unknown criminal history. In other words, for all cases on their court summary sheet, it could not be determined if they happened before or after the focal case. These cases are dropped.
+
+After dropping these cases, we are left with 72,734 cases in our sample.
+
+* 7,205 cases have at least one instance of a charge in their criminal history that was missing their grade.
+* 892 of these have cases are missing the grade for all charges in their criminal history. These cases are dropped.
+
+After dropping these cases, we are left with 71,842 cases.
