@@ -1,23 +1,19 @@
 library(here)
 library(lme4)
-library(rlang) # lme4 needs this.
+library(rlang)
 library(dplyr)
 library(readr)
 library(purrr)
 library(tidyr)
-
-dir <- here("output", "final_data")
-data <- read_csv(file.path(dir, "final_ds_cs.csv"))
+read_dir <- here("output", "final_data")
+write_dir <- here("output", "analysis", "model_output")
+data <- read_csv(file.path(read_dir, "final_analysis_file.csv"))
 
 ################################################################################
-# Turn bail into a binary 0/1 variable.
+# Read in data.
 ################################################################################
 data_clean <-
     data |>
-    mutate(
-        bail_decision_bin_nr =
-            if_else(bail_decision_bin == "Effectively bail or detained", 1, 0)
-    ) |>
     select(
         bail_decision_bin_nr, judge_assigned, main_defense, main_prosecutor,
         matches("dyad|triad")
@@ -58,7 +54,7 @@ estimate_null_model <- function(grouping_var, df) {
 }
 
 models <- map(null_model_args, estimate_null_model, df = data_clean)
-saveRDS(models, here("output", "analysis", "model_output"))
+saveRDS(models, here("output", "analysis", "model_output", "null_models.rds"))
 
 ################################################################################
 # Calculate ICC.
@@ -94,16 +90,4 @@ icc_df <-
     bind_rows() |>
     pivot_wider(id_cols = "model", names_from = "actor", values_from = "icc")
 
-write_csv(icc_df, file.path(dir, "icc_df.csv"))
-
-# Investigate
-# Profile Likelihood Confidence Intervals
-# a <- confint(models$judge, method = "profile")
-# a <- bootMer(mod)
-
-# model_judge <-
-#     glmer(
-#         bail_decision_bin_nr ~ (1 | judge_assigned),
-#         data = data_clean,
-#         family = "binomial"
-#     )
+write_csv(icc_df, file.path(write_dir, "icc_df.csv"))

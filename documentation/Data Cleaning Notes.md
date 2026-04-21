@@ -425,3 +425,9 @@ After dropping these cases, we are left with 72,734 cases in our sample.
 * 892 of these have cases are missing the grade for all charges in their criminal history. These cases are dropped.
 
 After dropping these cases, we are left with 71,842 cases.
+
+## General data checks
+
+166 cases are dropped because: 1) the defendant's age at the time of their hearing was under 14, and/or 2) the defense attorney's private/public status could not be determined, and/or 3) the main prosecutor and main defense attorney were the same person. 
+
+Final sample size is 71,676.

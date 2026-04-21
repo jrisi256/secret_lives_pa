@@ -3,8 +3,9 @@ library(readr)
 library(dplyr)
 library(purrr)
 library(broom)
+library(stringr)
 library(flextable)
-read_dir <- here("output", "final_data")
+read_dir <- here("output", "analysis", "model_output")
 write_dir <- here("output", "analysis", "graphs_tables")
 icc_df <- read_csv(file.path(read_dir, "icc_df.csv"))
 models <- readRDS(here("output", "analysis", "model_output", "null_models.rds"))
@@ -87,10 +88,10 @@ icc_table <-
         across(everything(), function(col) {if_else(is.na(col), "-", col)})
     )
 
-table1 <- icc_table |> filter(stringr::str_detect(Model, "\\b[1-6]\\b"))
-table2 <- icc_table |> filter(stringr::str_detect(Model, "4|7"))
-table3 <- icc_table |> filter(stringr::str_detect(Model, "5|8"))
-table4 <- icc_table |> filter(stringr::str_detect(Model, "6|9|10"))
+table1 <- icc_table |> filter(str_detect(Model, "\\b[1-6]\\b"))
+table2 <- icc_table |> filter(str_detect(Model, "4|7"))
+table3 <- icc_table |> filter(str_detect(Model, "5|8"))
+table4 <- icc_table |> filter(str_detect(Model, "6|9|10"))
 
 icc_tables <-
     bind_rows(table1, table2, table3, table4) |>
@@ -117,4 +118,4 @@ icc_flextable <-
     fontsize(size = 8, part = "all") |>
     set_table_properties(layout = "fixed")
 
-save_as_docx(icc_flextable, path = file.path(write_dir, "icc_tables.docx"))
+save_as_docx(icc_flextable, path = file.path(write_dir, "icc_table.docx"))
