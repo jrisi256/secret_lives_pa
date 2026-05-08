@@ -58,6 +58,18 @@ data_nested_county <- data_mod |> nest(.by = county)
 data_nested_county <-
     data_nested_county |>
     mutate(
+        null_model =
+            map(
+                data,
+                function(df) {
+                    glmer(
+                        bail_decision_bin_nr ~ (1 | judge_assigned) + (1 | main_defense) + (1 | main_prosecutor),
+                        family = "binomial",
+                        data = df,
+                        control = glmerControl(optCtrl = list(maxfun = 100000))
+                    )
+                }
+            ),
         model_max =
             map(
                 data,

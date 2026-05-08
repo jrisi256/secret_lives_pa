@@ -21,7 +21,7 @@ data_clean <-
         main_defense, main_prosecutor, defense_team, prosecutor_team,
         any_private, nr_charges, sex, race_collapsed, dob, matches("dyad"),
         matches("triad"), matches("^nr_"), main_defense_private_or_public,
-        counsel, defender_requested, application_provided
+        counsel, defender_requested, application_provided, disposition
     ) |>
     mutate(
         bail_decision_bin_nr = if_else(bail_decision_bin == "Effectively bail or detained", 1, 0),
@@ -72,7 +72,7 @@ missing_data_clean <-
         main_defense, main_prosecutor, defense_team, prosecutor_team,
         any_private, nr_charges, sex, race_collapsed, dob, matches("dyad"),
         matches("triad"), matches("^nr_"), main_defense_private_or_public,
-        counsel, defender_requested, application_provided
+        counsel, defender_requested, application_provided, disposition
     ) |>
     mutate(
         bail_decision_bin_nr = if_else(bail_decision_bin == "Effectively bail or detained", 1, 0),

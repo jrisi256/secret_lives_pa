@@ -30,7 +30,7 @@ demographic_judge_df <-
                 "sex", "dob", "race", "county", "township", "judge_assigned",
                 "address", "address_type", "counsel", "defender_requested",
                 "application_provided", "fingerprinted", "issue_date",
-                "file_date", "arrest_date"
+                "file_date", "arrest_date", "disposition"
             )
     ) |>
     pivot_wider(

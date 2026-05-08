@@ -17,6 +17,11 @@ data <-
                 highest_charge_max %in% c("h1", "h2") ~ "f1",
                 T ~ highest_charge_max
             ),
+        highest_charge_min =
+            case_when(
+                highest_charge_min %in% c("h1", "h2") ~ "f1",
+                T ~ highest_charge_min
+            ),
         year_cat =
             case_when(
                 year >= 2005 & year <= 2012 ~ "2005-2012",
@@ -33,7 +38,8 @@ descriptive_table_cat <-
     data |>
     select(
         county, sex, race_collapsed, bail_decision_bin_nr, mult_defense,
-        mult_prosecutor, main_defense_private, highest_charge_max, year, year_cat
+        mult_prosecutor, main_defense_private, highest_charge_max,
+        highest_charge_min, year, year_cat
     ) |>
     mutate(across(everything(), function(col) {as.character(col)})) |>
     pivot_longer(everything(), names_to = "variable", values_to = "value") |>
@@ -109,9 +115,10 @@ descriptive_table <-
         variable =
             case_when(
                 variable == "main_defense_private" ~ "Private attorney on case?",
-                variable == "bail_decision_bin_nr" ~ "Bail set?",
+                variable == "bail_decision_bin_nr" ~ "Bail set or detained?",
                 variable == "county" ~ "County",
-                variable == "highest_charge_max" ~ "Highest charge",
+                variable == "highest_charge_max" ~ "Highest charge (maximum)",
+                variable == "highest_charge_min" ~ "Highest charge (minimum)",
                 variable == "mult_defense" ~ "Multiple defense attorneys?",
                 variable == "mult_prosecutor" ~ "Multiple prosecutors?",
                 variable == "race_collapsed" ~ "Race",
@@ -163,7 +170,8 @@ descriptive_table <-
                         "Defense + Prosecutor (Dyad)",
                         "Judge + Defense + Prosecutor (Triad)",
                         "Age", "Private attorney on case?",
-                        "Bail set?", "County", "Highest charge",
+                        "Bail set or detained?", "County",
+                        "Highest charge (maximum)", "Highest charge (minimum)",
                         "Multiple defense attorneys?", "Multiple prosecutors?",
                         "Race", "Sex", "Year", "Year (collapsed)"
                     )

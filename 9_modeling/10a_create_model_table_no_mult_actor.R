@@ -1,10 +1,9 @@
 library(here)
 library(lme4)
 library(rlang)
-library(purrr)
 library(dplyr)
 library(tidyr)
-library(stringr)
+library(purrr)
 library(flextable)
 library(broom.mixed)
 read_dir <- here("output", "analysis", "model_output")
@@ -13,37 +12,8 @@ write_dir <- here("output", "analysis", "graphs_tables")
 ################################################################################
 # Read in models.
 ################################################################################
-stratified_models <- readRDS(file.path(read_dir, "stratified_models.rds"))
-
-################################################################################
-# Calculate adjusted ICC values.
-################################################################################
-calc_icc_adjusted <- function(variance, total_variance) {
-    sigma2 <- pi ^ 2 / 3
-    variance / (sigma2 + total_variance)
-}
-
-my_icc_adjusted <- function(model, model_name) {
-    variances <- VarCorr(model)
-    individual_variances <- map(variances, function(variance) {variance[[1]]})
-    
-    icc_values <-
-        map(
-            individual_variances,
-            calc_icc_adjusted,
-            total_variance = sum(unlist(individual_variances))
-        )
-    
-    icc_df <-
-        tibble(
-            estimate = unname(unlist(icc_values)),
-            group = names(icc_values),
-            term = "ICC - Unadjusted",
-            model = model_name
-        )
-    
-    return(icc_df)
-}
+model_max <- readRDS(file.path(read_dir, "no_mult_actor_full_model_max.rds"))
+model_min <- readRDS(file.path(read_dir, "no_mult_actor_full_model_min.rds"))
 
 ################################################################################
 # Calculate un-adjusted ICC values.
@@ -77,110 +47,26 @@ my_icc_unadjusted <- function(model, model_name) {
     return(icc_df)
 }
 
-icc_table_max <-
-    pmap(
-        list(stratified_models$model_max, stratified_models$county),
-        my_icc_unadjusted
-    ) |>
-    bind_rows()
-
-icc_table_min <-
-    pmap(
-        list(stratified_models$model_min, stratified_models$county),
-        my_icc_unadjusted
-    ) |>
-    bind_rows()
-
-################################################################################
-# Create ICC table comparing null and full.
-################################################################################
-tidy_icc_max <-
-    icc_table_max |>
-    filter(!str_detect(group, "dyad")) |>
-    pivot_wider(
-        id_cols = "group", names_from = "model", values_from = "estimate"
-    ) |>
-    mutate(
-        group =
-            case_when(
-                group == "main_defense" ~ "Defense",
-                group == "main_prosecutor" ~ "Prosecutor",
-                group == "judge_assigned" ~ "Judge"
-            ),
-        group = factor(group, levels = c("Judge", "Defense", "Prosecutor")),
-        model = "Full (Max)"
-    ) |>
-    rename(
-        Allegheny = allegheny, Centre = centre, Dauphin = dauphin, Erie = erie,
-        Montgomery = montgomery, Model = model
-    )
-
-tidy_icc <-
-    pmap(
-        list(stratified_models$null_model, stratified_models$county),
-        my_icc_adjusted
-    ) |>
-    bind_rows() |>
-    pivot_wider(
-        id_cols = "group", names_from = "model", values_from = "estimate"
-    ) |>
-    mutate(
-        group =
-            case_when(
-                group == "main_defense" ~ "Defense",
-                group == "main_prosecutor" ~ "Prosecutor",
-                group == "judge_assigned" ~ "Judge"
-            ),
-        group = factor(group, levels = c("Judge", "Defense", "Prosecutor")),
-        model = "Null"
-    ) |>
-    rename(
-        Allegheny = allegheny, Centre = centre, Dauphin = dauphin, Erie = erie,
-        Montgomery = montgomery, Model = model
-    ) |>
-    bind_rows(tidy_icc_max) |>
-    arrange(group) |>
-    mutate(
-        group = if_else(Model == "Full (Max)", NA, group),
-        across(where(is.numeric), function(col) {sprintf("%.3f", signif(col, 3))})
-    )
-
-icc_flextable <-
-    tidy_icc |>
-    as_grouped_data(groups = "group") |>
-    filter(!is.na(Model) | !is.na(group)) |>
-    as_flextable() |>
-    compose(j = 1, i = ~ !is.na(group), value = as_paragraph(as_chunk(group))) |>
-    bold(j = 1, i = ~ !is.na(group), bold = T, part = "body") |>
-    fontsize(size = 8, part = "all") |>
-    width(j = 5, width = 1) |>
-    set_table_properties(layout = "fixed")
-
-save_as_docx(
-    icc_flextable,
-    path = file.path(write_dir, "stratified_icc_tables.docx")
-)
+icc_values_max <- my_icc_unadjusted(model_max, "Model (Max)_Estimate")
+icc_values_min <- my_icc_unadjusted(model_min, "Model (Min)_Estimate")
 
 ################################################################################
 # Tidy up model results.
 ################################################################################
 tidy_results_max <-
-    pmap(
-        list(stratified_models$model_max, stratified_models$county),
-        function(model, model_name) {tidy(model) |> mutate(model = model_name)}
-    ) |>
-    bind_rows(icc_table_max) |>
+    tidy(model_max) |>
+    mutate(model = "Model (Max)_Estimate") |>
+    bind_rows(icc_values_max)
+
+tidy_results_min <-
+    tidy(model_min) |>
+    mutate(model = "Model (Min)_Estimate") |>
+    bind_rows(icc_values_min)
+
+tidy_results <-
+    bind_rows(tidy_results_max, tidy_results_min) |>
     rename(actor = group) |>
     mutate(
-        model =
-            case_when(
-              model == "allegheny" ~ "Allegheny",
-              model == "blair" ~ "Blair",
-              model == "centre" ~ "Centre",
-              model == "dauphin" ~ "Dauphin",
-              model == "erie" ~ "Erie",
-              model == "montgomery" ~ "Montgomery"
-            ),
         group = if_else(is.na(actor), "Fixed effects", "Random effects"),
         significance =
             case_when(
@@ -254,8 +140,8 @@ tidy_results_max <-
     arrange(group, actor) |>
     select(-actor)
 
-model_flextable_max <-
-    tidy_results_max |>
+model_flextable <-
+    tidy_results |>
     as_grouped_data(groups = c("group", "actor_display")) |>
     filter(!is.na(term) | !is.na(group) | !is.na(actor_display)) |>
     as_flextable() |>
@@ -267,10 +153,7 @@ model_flextable_max <-
     italic(j = 1, i = ~ !is.na(actor_display), italic = TRUE, part = "body") |>
     padding(j = 1, i = ~ !is.na(term), padding.left = 40, part = "body") |>
     fontsize(size = 8, part = "all") |>
-    width(j = c(1, 2, 3, 4, 5, 6), width = c(2.25, 0.75, 0.75, 0.75, 1, 1)) |>
+    width(j = c(1, 2, 3), width = c(2.5, 1, 1)) |>
     set_table_properties(layout = "fixed")
 
-save_as_docx(
-    model_flextable_max,
-    path = file.path(write_dir, "stratified_model_tables_max.docx")
-)
+save_as_docx(model_flextable, path = file.path(write_dir, "full_model_table_no_mult_actors.docx"))

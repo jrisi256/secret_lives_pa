@@ -93,7 +93,7 @@ icc_table <-
         "Private defenders only" = private,
         "Application not provided for a public defender" = app,
         "Defendant not advised of their right to counsel" = counsel,
-        "Defendant requested public defender" = request,
+        "Defendant did not request a public defender" = request,
         "All conditions" = all
     ) |>
     arrange(Actor)

@@ -55,7 +55,7 @@ bail_df <-
         percentage = if_else(bail_decision == "ROR" & percentage < 1, 1, percentage),
         bail_decision_bin =
             if_else(
-                bail_decision == "ROR" | bail_decision == "Non-monetary",
+                bail_decision == "ROR" | bail_decision == "Non-monetary" | bail_decision == "Unsecured",
                 "Effectively no bail",
                 "Effectively bail or detained"
             )

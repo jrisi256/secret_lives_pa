@@ -422,7 +422,7 @@ final_df <-
         (prior_nr_charges != prior_nr_missing + prior_nr_other | prior_nr_charges == 0)
     ) |>
     mutate(
-        judge_prosecutuor_dyad = paste0(judge_assigned, "_", main_prosecutor),
+        judge_prosecutor_dyad = paste0(judge_assigned, "_", main_prosecutor),
         judge_defense_dyad = paste0(judge_assigned, "_", main_defense),
         defense_prosecutor_dyad = paste0(main_defense, "_", main_prosecutor),
         judge_defense_prosecutor_triad = paste0(judge_assigned, "_", main_defense, "_", main_prosecutor)

@@ -334,28 +334,28 @@ The following lawyers did not have a supreme court number, but we decided to giv
 56. william lyons, esq. --> 900024
 57. william karl wigman, esq. --> 900025
 58. natalie heil, esq. --> 900028
-60. paula hutchinson, esq. --> 900029
-61. michelle collins, esq. --> 900030
-62. michael profeta, esq. --> 900031
-63. megan flores, esq. --> 900032
-64. kaalil muhammad, esq. --> 900033
-65. martin scaratow, esq. --> 900034
-66. mcgraw larry, esq. --> 900035
-67. patrick atty. coyne, esq. --> 900036
-68. julia l. dellinger --> 900037
-69. thomas pratt + thomas pratt, esq. --> 900038
-70. vincent a. cirillo jr. + vincent a. cirillo jr., esq. --> 90003
-71. megan strait --> 900040
-72. kathryn hunter-nonas --> 900042
-73. karen avery, esq. --> 900043
-74. nick peters --> 900044
-75. nialena caravasos, esq. --> 900045
-76. kyle mcgee, esq. --> 900046
-77. larr barto, esq. --> 900047
-78. lawrence singer, esq. --> 900048
-79. k wynett, esq. --> 900049
-80. kristyne sharpe --> 900050
-81. kim spackman --> 900051
+59. paula hutchinson, esq. --> 900029
+60. michelle collins, esq. --> 900030
+61. michael profeta, esq. --> 900031
+62. megan flores, esq. --> 900032
+63. kaalil muhammad, esq. --> 900033
+64. martin scaratow, esq. --> 900034
+65. mcgraw larry, esq. --> 900035
+66. patrick atty. coyne, esq. --> 900036
+67. julia l. dellinger --> 900037
+68. thomas pratt + thomas pratt, esq. --> 900038
+69. vincent a. cirillo jr. + vincent a. cirillo jr., esq. --> 90003
+70. megan strait --> 900040
+71. kathryn hunter-nonas --> 900042
+72. karen avery, esq. --> 900043
+73. nick peters --> 900044
+74. nialena caravasos, esq. --> 900045
+75. kyle mcgee, esq. --> 900046
+76. larr barto, esq. --> 900047
+77. lawrence singer, esq. --> 900048
+78. k wynett, esq. --> 900049
+79. kristyne sharpe --> 900050
+80. kim spackman --> 900051
 
 ## Bail
 
